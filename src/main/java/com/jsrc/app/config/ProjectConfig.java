@@ -5,13 +5,15 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.yaml.snakeyaml.Yaml;
 
 /**
  * Project configuration loaded from {@code .jsrc.yaml}.
- * Supports minimal YAML subset for jsrc architecture definitions.
+ * Uses SnakeYAML for robust parsing.
  */
 public record ProjectConfig(
         List<String> sourceRoots,
@@ -26,7 +28,7 @@ public record ProjectConfig(
         Path configFile = directory.resolve(CONFIG_FILE);
         if (!Files.exists(configFile)) return null;
         try {
-            return parse(Files.readAllLines(configFile));
+            return parse(Files.readString(configFile));
         } catch (IOException e) {
             logger.error("Error reading {}: {}", configFile, e.getMessage());
             return null;
@@ -39,220 +41,97 @@ public record ProjectConfig(
             return null;
         }
         try {
-            return parse(Files.readAllLines(configPath));
+            return parse(Files.readString(configPath));
         } catch (IOException e) {
             logger.error("Error reading {}: {}", configPath, e.getMessage());
             return null;
         }
     }
 
-    private static ProjectConfig parse(List<String> lines) {
-        List<String> sourceRoots = new ArrayList<>();
-        List<String> excludes = new ArrayList<>();
-        String javaVersion = "";
+    @SuppressWarnings("unchecked")
+    private static ProjectConfig parse(String yamlContent) {
+        Yaml yaml = new Yaml();
+        Map<String, Object> root = yaml.load(yamlContent);
+        if (root == null) root = Map.of();
+
+        List<String> sourceRoots = getStringList(root, "sourceRoots");
+        List<String> excludes = getStringList(root, "excludes");
+        String javaVersion = getString(root, "javaVersion", "");
+        ArchitectureConfig arch = parseArchitecture((Map<String, Object>) root.get("architecture"));
+
+        return new ProjectConfig(sourceRoots, excludes, javaVersion, arch);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static ArchitectureConfig parseArchitecture(Map<String, Object> archMap) {
+        if (archMap == null) return ArchitectureConfig.empty();
 
         List<ArchitectureConfig.LayerDef> layers = new ArrayList<>();
+        List<Map<String, Object>> layersList = (List<Map<String, Object>>) archMap.get("layers");
+        if (layersList != null) {
+            for (Map<String, Object> lm : layersList) {
+                layers.add(new ArchitectureConfig.LayerDef(
+                        getString(lm, "name", ""),
+                        getString(lm, "pattern", ""),
+                        getStringList(lm, "annotations")));
+            }
+        }
+
         List<ArchitectureConfig.RuleDef> rules = new ArrayList<>();
-        List<String> endpointAnnotations = new ArrayList<>();
+        List<Map<String, Object>> rulesList = (List<Map<String, Object>>) archMap.get("rules");
+        if (rulesList != null) {
+            for (Map<String, Object> rm : rulesList) {
+                rules.add(new ArchitectureConfig.RuleDef(
+                        getString(rm, "id", ""),
+                        getString(rm, "description", ""),
+                        getString(rm, "from", ""),
+                        getString(rm, "layer", ""),
+                        getString(rm, "denyImport", ""),
+                        getString(rm, "require", ""),
+                        getString(rm, "denyAnnotation", "")));
+            }
+        }
+
+        List<String> endpoints = getStringList(archMap, "endpoints");
+
         List<ArchitectureConfig.InvokerDef> invokers = new ArrayList<>();
-
-        // State machine for YAML parsing
-        String section = "";      // top-level key
-        String subSection = "";   // architecture sub-key
-        String listContext = "";  // what list items belong to
-
-        // Current object being built
-        String layerName = "", layerPattern = "";
-        List<String> layerAnnotations = new ArrayList<>();
-
-        String ruleId = "", ruleDesc = "", ruleFrom = "", ruleLayer = "";
-        String ruleDenyImport = "", ruleRequire = "", ruleDenyAnnotation = "";
-
-        String invMethod = "";
-        int invTargetArg = 0;
-        String invResolveClass = "";
-
-        for (String line : lines) {
-            if (line.trim().isEmpty() || line.trim().startsWith("#")) continue;
-            int indent = countIndent(line);
-            String trimmed = line.trim();
-
-            // Top-level keys (indent 0)
-            if (indent == 0 && trimmed.contains(":")) {
-                String topKey = trimmed.split(":")[0].trim();
-                String topVal = trimmed.substring(trimmed.indexOf(':') + 1).trim()
-                        .replaceAll("^[\"']|[\"']$", "");
-                if ("javaVersion".equals(topKey) && !topVal.isEmpty()) {
-                    javaVersion = topVal;
-                }
-                section = topKey;
-                subSection = "";
-                listContext = "";
-                continue;
-            }
-
-            // Architecture sub-sections (indent 2)
-            if ("architecture".equals(section) && indent == 2 && !trimmed.startsWith("-")) {
-                // Flush previous object
-                flushLayer(layers, layerName, layerPattern, layerAnnotations);
-                layerName = ""; layerPattern = ""; layerAnnotations = new ArrayList<>();
-                flushRule(rules, ruleId, ruleDesc, ruleFrom, ruleLayer, ruleDenyImport, ruleRequire, ruleDenyAnnotation);
-                ruleId = ""; ruleDesc = ""; ruleFrom = ""; ruleLayer = "";
-                ruleDenyImport = ""; ruleRequire = ""; ruleDenyAnnotation = "";
-                flushInvoker(invokers, invMethod, invTargetArg, invResolveClass);
-                invMethod = ""; invTargetArg = 0; invResolveClass = "";
-
-                subSection = trimmed.split(":")[0].trim();
-                listContext = subSection;
-                continue;
-            }
-
-            // List items
-            if (trimmed.startsWith("- ")) {
-                String value = trimmed.substring(2).trim().replaceAll("^[\"']|[\"']$", "");
-
-                // Check if it's a list item with key:value (object start)
-                if (value.contains(":")) {
-                    // Flush previous object
-                    if ("layers".equals(listContext)) {
-                        flushLayer(layers, layerName, layerPattern, layerAnnotations);
-                        layerName = ""; layerPattern = ""; layerAnnotations = new ArrayList<>();
-                    } else if ("rules".equals(listContext)) {
-                        flushRule(rules, ruleId, ruleDesc, ruleFrom, ruleLayer, ruleDenyImport, ruleRequire, ruleDenyAnnotation);
-                        ruleId = ""; ruleDesc = ""; ruleFrom = ""; ruleLayer = "";
-                        ruleDenyImport = ""; ruleRequire = ""; ruleDenyAnnotation = "";
-                    } else if ("invokers".equals(listContext)) {
-                        flushInvoker(invokers, invMethod, invTargetArg, invResolveClass);
-                        invMethod = ""; invTargetArg = 0; invResolveClass = "";
-                    }
-
-                    String key = value.split(":")[0].trim();
-                    String val = value.substring(value.indexOf(':') + 1).trim().replaceAll("^[\"']|[\"']$", "");
-
-                    switch (listContext) {
-                        case "layers" -> { if ("name".equals(key)) layerName = val; else if ("pattern".equals(key)) layerPattern = val; }
-                        case "rules" -> assignRuleField(key, val, ruleId, ruleDesc, ruleFrom, ruleLayer, ruleDenyImport, ruleRequire, ruleDenyAnnotation);
-                        case "invokers" -> { if ("method".equals(key)) invMethod = val; else if ("targetArg".equals(key)) invTargetArg = parseInt(val); else if ("resolveClass".equals(key)) invResolveClass = val; }
-                    }
-                    // Handle rule assignment via return values
-                    if ("rules".equals(listContext)) {
-                        switch (key) {
-                            case "id" -> ruleId = val;
-                            case "description" -> ruleDesc = val;
-                            case "from" -> ruleFrom = val;
-                            case "layer" -> ruleLayer = val;
-                            case "denyImport" -> ruleDenyImport = val;
-                            case "require" -> ruleRequire = val;
-                            case "denyAnnotation" -> ruleDenyAnnotation = val;
-                        }
-                    }
-                } else {
-                    // Simple list item
-                    switch (section + "." + listContext) {
-                        case ".sourceRoots" -> sourceRoots.add(value);
-                        case ".excludes" -> excludes.add(value);
-                        case "architecture.endpoints" -> endpointAnnotations.add(value);
-                        case "architecture.layers" -> layerAnnotations.add(value); // annotations sub-list
-                    }
-                    // Also handle top-level lists
-                    if ("sourceRoots".equals(section)) sourceRoots.add(value);
-                    else if ("excludes".equals(section)) excludes.add(value);
-                }
-                continue;
-            }
-
-            // Key-value pairs inside objects
-            if (trimmed.contains(":")) {
-                String key = trimmed.split(":")[0].trim();
-                String val = trimmed.substring(trimmed.indexOf(':') + 1).trim().replaceAll("^[\"']|[\"']$", "");
-
-                if ("javaVersion".equals(key) && section.isEmpty()) {
-                    javaVersion = val;
-                } else if ("javaVersion".equals(key)) {
-                    javaVersion = val;
-                }
-
-                // Handle sub-keys in list objects
-                if ("layers".equals(listContext)) {
-                    switch (key) {
-                        case "name" -> layerName = val;
-                        case "pattern" -> layerPattern = val;
-                        case "annotations" -> {} // list follows
-                    }
-                } else if ("rules".equals(listContext)) {
-                    switch (key) {
-                        case "id" -> ruleId = val;
-                        case "description" -> ruleDesc = val;
-                        case "from" -> ruleFrom = val;
-                        case "layer" -> ruleLayer = val;
-                        case "denyImport" -> ruleDenyImport = val;
-                        case "require" -> ruleRequire = val;
-                        case "denyAnnotation" -> ruleDenyAnnotation = val;
-                    }
-                } else if ("invokers".equals(listContext)) {
-                    switch (key) {
-                        case "method" -> invMethod = val;
-                        case "targetArg" -> invTargetArg = parseInt(val);
-                        case "resolveClass" -> invResolveClass = val;
-                    }
-                }
+        List<Map<String, Object>> invokersList = (List<Map<String, Object>>) archMap.get("invokers");
+        if (invokersList != null) {
+            for (Map<String, Object> im : invokersList) {
+                invokers.add(new ArchitectureConfig.InvokerDef(
+                        getString(im, "method", ""),
+                        getInt(im, "targetArg", 0),
+                        getString(im, "resolveClass", "")));
             }
         }
 
-        // Flush last objects
-        flushLayer(layers, layerName, layerPattern, layerAnnotations);
-        flushRule(rules, ruleId, ruleDesc, ruleFrom, ruleLayer, ruleDenyImport, ruleRequire, ruleDenyAnnotation);
-        flushInvoker(invokers, invMethod, invTargetArg, invResolveClass);
-
-        // Deduplicate sourceRoots
-        sourceRoots = new ArrayList<>(new java.util.LinkedHashSet<>(sourceRoots));
-
-        var arch = new ArchitectureConfig(
+        return new ArchitectureConfig(
                 List.copyOf(layers), List.copyOf(rules),
-                List.copyOf(endpointAnnotations), List.copyOf(invokers));
-
-        return new ProjectConfig(
-                sourceRoots.isEmpty() ? List.of() : List.copyOf(sourceRoots),
-                excludes.isEmpty() ? List.of() : List.copyOf(excludes),
-                javaVersion, arch);
+                List.copyOf(endpoints), List.copyOf(invokers));
     }
 
-    private static void flushLayer(List<ArchitectureConfig.LayerDef> layers,
-                                    String name, String pattern, List<String> annotations) {
-        if (!name.isEmpty()) {
-            layers.add(new ArchitectureConfig.LayerDef(name, pattern, List.copyOf(annotations)));
+    @SuppressWarnings("unchecked")
+    private static List<String> getStringList(Map<String, Object> map, String key) {
+        Object val = map.get(key);
+        if (val instanceof List<?> list) {
+            return list.stream()
+                    .map(Object::toString)
+                    .toList();
         }
+        return List.of();
     }
 
-    private static void flushRule(List<ArchitectureConfig.RuleDef> rules,
-                                   String id, String desc, String from, String layer,
-                                   String denyImport, String require, String denyAnnotation) {
-        if (!id.isEmpty()) {
-            rules.add(new ArchitectureConfig.RuleDef(id, desc, from, layer, denyImport, require, denyAnnotation));
+    private static String getString(Map<String, Object> map, String key, String defaultVal) {
+        Object val = map.get(key);
+        return val != null ? val.toString() : defaultVal;
+    }
+
+    private static int getInt(Map<String, Object> map, String key, int defaultVal) {
+        Object val = map.get(key);
+        if (val instanceof Number n) return n.intValue();
+        if (val instanceof String s) {
+            try { return Integer.parseInt(s); } catch (NumberFormatException e) { return defaultVal; }
         }
-    }
-
-    private static void flushInvoker(List<ArchitectureConfig.InvokerDef> invokers,
-                                      String method, int targetArg, String resolveClass) {
-        if (!method.isEmpty()) {
-            invokers.add(new ArchitectureConfig.InvokerDef(method, targetArg, resolveClass));
-        }
-    }
-
-    private static void assignRuleField(String key, String val, String... ignored) {
-        // Assignment handled by caller via switch
-    }
-
-    private static int countIndent(String line) {
-        int count = 0;
-        for (char c : line.toCharArray()) {
-            if (c == ' ') count++;
-            else break;
-        }
-        return count;
-    }
-
-    private static int parseInt(String s) {
-        try { return Integer.parseInt(s); } catch (NumberFormatException e) { return 0; }
+        return defaultVal;
     }
 }

@@ -19,9 +19,15 @@ import com.jsrc.app.parser.model.MethodInfo;
 public class ContextAssembler {
 
     private final CodeParser parser;
+    private final DependencyAnalyzer dependencyAnalyzer;
 
     public ContextAssembler(CodeParser parser) {
+        this(parser, new DependencyAnalyzer());
+    }
+
+    public ContextAssembler(CodeParser parser, DependencyAnalyzer dependencyAnalyzer) {
         this.parser = parser;
+        this.dependencyAnalyzer = dependencyAnalyzer;
     }
 
     /**
@@ -82,8 +88,7 @@ public class ContextAssembler {
         ctx.put("methods", methods);
 
         // Dependencies
-        var analyzer = new DependencyAnalyzer();
-        var deps = analyzer.analyze(files, className);
+        var deps = dependencyAnalyzer.analyze(files, className);
         if (deps != null) {
             Map<String, Object> depsMap = new LinkedHashMap<>();
             depsMap.put("imports", deps.imports());

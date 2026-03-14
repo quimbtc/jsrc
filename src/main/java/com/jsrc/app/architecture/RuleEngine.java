@@ -19,10 +19,16 @@ public class RuleEngine {
 
     private final ArchitectureConfig config;
     private final LayerResolver layerResolver;
+    private final com.jsrc.app.parser.DependencyAnalyzer dependencyAnalyzer;
 
     public RuleEngine(ArchitectureConfig config) {
+        this(config, new com.jsrc.app.parser.DependencyAnalyzer());
+    }
+
+    public RuleEngine(ArchitectureConfig config, com.jsrc.app.parser.DependencyAnalyzer dependencyAnalyzer) {
         this.config = config;
         this.layerResolver = new LayerResolver(config.layers());
+        this.dependencyAnalyzer = dependencyAnalyzer;
     }
 
     /**
@@ -81,10 +87,10 @@ public class RuleEngine {
 
         // Check each class in 'from' layer
         List<ClassInfo> fromClasses = layerResolver.filterByLayer(classes, fromLayer);
-        var analyzer = new DependencyAnalyzer();
+        
 
         for (ClassInfo ci : fromClasses) {
-            DependencyResult deps = analyzer.analyze(files, ci.name());
+            DependencyResult deps = dependencyAnalyzer.analyze(files, ci.name());
             if (deps == null) continue;
 
             for (String imp : deps.imports()) {
@@ -117,11 +123,11 @@ public class RuleEngine {
         if (layer == null) return violations;
 
         List<ClassInfo> targetClasses = layerResolver.filterByLayer(classes, layer);
-        var analyzer = new DependencyAnalyzer();
+        
 
         for (ClassInfo ci : targetClasses) {
             if (ci.isInterface()) continue;
-            DependencyResult deps = analyzer.analyze(files, ci.name());
+            DependencyResult deps = dependencyAnalyzer.analyze(files, ci.name());
             if (deps == null) continue;
 
             // Has field deps but no constructor deps → likely field injection
