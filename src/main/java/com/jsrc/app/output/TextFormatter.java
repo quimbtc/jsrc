@@ -70,6 +70,18 @@ public class TextFormatter implements OutputFormatter {
     }
 
     @Override
+    public void printViolations(List<com.jsrc.app.architecture.Violation> violations) {
+        if (violations.isEmpty()) {
+            System.out.println("No violations found.");
+            return;
+        }
+        System.out.printf("Violations (%d):%n", violations.size());
+        for (var v : violations) {
+            System.out.printf("  [%s] %s: %s%n", v.ruleId(), v.className(), v.message());
+        }
+    }
+
+    @Override
     public void printDiff(List<String> modified, List<String> added, List<String> deleted) {
         if (modified.isEmpty() && added.isEmpty() && deleted.isEmpty()) {
             System.out.println("No changes since last index.");

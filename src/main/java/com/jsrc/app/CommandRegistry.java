@@ -23,6 +23,8 @@ public final class CommandRegistry {
     ) {}
 
     private static final List<CommandDef> COMMANDS = List.of(
+            new CommandDef("--check", "Check architecture rules, report violations",
+                    List.of("[ruleId]"), List.of("--json", "--metrics"), "object"),
             new CommandDef("--layer", "List classes in an architectural layer",
                     List.of("<layerName>"), List.of("--json", "--fields", "--metrics"), "array"),
             new CommandDef("--diff", "Show files changed since last index",

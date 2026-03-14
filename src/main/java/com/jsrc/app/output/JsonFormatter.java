@@ -69,6 +69,22 @@ public class JsonFormatter implements OutputFormatter {
     }
 
     @Override
+    public void printViolations(List<com.jsrc.app.architecture.Violation> violations) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("violations", violations.stream().map(v -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("ruleId", v.ruleId());
+            m.put("className", v.className());
+            m.put("message", v.message());
+            if (!v.file().isEmpty()) m.put("file", v.file());
+            if (v.line() > 0) m.put("line", v.line());
+            return m;
+        }).toList());
+        result.put("summary", Map.of("total", violations.size()));
+        System.out.println(JsonWriter.toJson(result));
+    }
+
+    @Override
     public void printDiff(List<String> modified, List<String> added, List<String> deleted) {
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("modified", modified);

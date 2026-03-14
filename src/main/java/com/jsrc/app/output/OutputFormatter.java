@@ -42,6 +42,11 @@ public interface OutputFormatter {
     void printClasses(List<ClassInfo> classes, Path sourceRoot);
 
     /**
+     * Prints architecture check results (violations).
+     */
+    void printViolations(List<com.jsrc.app.architecture.Violation> violations);
+
+    /**
      * Prints diff results (changed files since last index).
      */
     void printDiff(List<String> modified, List<String> added, List<String> deleted);
