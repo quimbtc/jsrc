@@ -41,6 +41,17 @@
 | `--index` (first run, full) | ~145s | 1,621 | all indexed |
 | `--index` (second run, incremental) | **<1s** | 1,621 | 0 re-indexed |
 
+### With index (after `--index`)
+
+| Command | Time | Speedup |
+|---------|------|---------|
+| `--overview` | **41ms** | 3,555x |
+| `--classes` | **146ms** | ~993x |
+| `--annotations Override` | **304ms** | 373x |
+| `--hierarchy SpringApplication` | **60ms** | 45x |
+| `--summary SpringApplication` | **39ms** | 188x |
+| `--index` (incremental, 0 changes) | **993ms** | 146x |
+
 ### Key insight
 
 - **Targeted commands** (search, deps, summary): ~5-7s — usable in real-time
