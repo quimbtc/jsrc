@@ -78,6 +78,29 @@ class MethodResolverTest {
     }
 
     @Test
+    @DisplayName("Should parse empty parens as zero-arg method")
+    void shouldParseEmptyParens() {
+        var ref = MethodResolver.parse("process()");
+        assertEquals("process", ref.methodName());
+        assertTrue(ref.hasParamTypes());
+        assertEquals(0, ref.paramTypes().size());
+    }
+
+    @Test
+    @DisplayName("Should filter zero-arg overload with empty parens")
+    void shouldFilterZeroArg() {
+        var methods = List.of(
+                method("process", List.of()),
+                method("process", List.of(new ParameterInfo("int", "id")))
+        );
+
+        var ref = MethodResolver.parse("process()");
+        var filtered = MethodResolver.filter(methods, ref);
+        assertEquals(1, filtered.size());
+        assertTrue(filtered.getFirst().parameters().isEmpty());
+    }
+
+    @Test
     @DisplayName("Should filter by class name")
     void shouldFilterByClass() {
         var m1 = MethodInfo.basic("process", "ServiceA", 1, 5, "void", List.of(), List.of(), "");

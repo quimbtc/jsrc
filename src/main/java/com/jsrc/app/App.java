@@ -192,7 +192,7 @@ public class App {
                 System.exit(ExitCode.BAD_USAGE);
             }
             String methodName = argList.get(2);
-            resultCount[0] = runCallers(javaFiles, methodName, formatter);
+            resultCount[0] = runCallers(javaFiles, methodName, config, formatter);
         } else if ("--callees".equals(command)) {
             if (argList.size() < 3) {
                 System.err.println("Error: --callees requires a method name");
@@ -582,6 +582,7 @@ public class App {
     }
 
     private static int runCallers(List<Path> javaFiles, String methodInput,
+                                      com.jsrc.app.config.ProjectConfig config,
                                       OutputFormatter formatter) {
         var ref = com.jsrc.app.util.MethodResolver.parse(methodInput);
         String methodName = ref.methodName();
@@ -608,7 +609,6 @@ public class App {
         }
 
         // Add reflective callers from invoker config
-        var config = com.jsrc.app.config.ProjectConfig.load(java.nio.file.Path.of("."));
         if (config != null && !config.architecture().invokers().isEmpty()) {
             var resolver = new com.jsrc.app.architecture.InvokerResolver(config.architecture().invokers());
             for (var rc : resolver.resolve(javaFiles)) {
@@ -665,28 +665,17 @@ public class App {
         var ref = com.jsrc.app.util.MethodResolver.parse(target);
         if (ref.hasClassName()) {
             // Class.method or Class.method(params)
-            if (ref.hasParamTypes()) {
-                // Find with param filtering
-                List<MethodInfo> methods = parser.findMethods(
-                        findFileForClass(javaFiles, ref.className()), ref.methodName(),
-                        ref.paramTypes());
-                if (!methods.isEmpty()) {
-                    MethodInfo m = methods.getFirst();
-                    result = new com.jsrc.app.parser.SourceReader.ReadResult(
-                            m.className(), m.name(), findFileForClass(javaFiles, ref.className()),
-                            m.startLine(), m.endLine(), m.content());
-                } else {
-                    result = null;
-                }
-            } else {
-                result = reader.readMethod(javaFiles, ref.className(), ref.methodName());
-            }
+            result = findMethodRead(parser, reader, javaFiles, ref);
         } else if (target.contains("(")) {
-            // method(params) without class — not supported for read
-            result = reader.readClass(javaFiles, ref.methodName());
+            // method(params) without class — search all files
+            result = findMethodReadAllFiles(parser, javaFiles, ref);
         } else {
-            // Class only
+            // No dot, no parens — could be a class name
             result = reader.readClass(javaFiles, target);
+            if (result == null) {
+                // Try as a method name
+                result = findMethodReadAllFiles(parser, javaFiles, ref);
+            }
         }
 
         if (result != null) {
@@ -695,6 +684,45 @@ public class App {
         }
         System.err.printf("'%s' not found.%n", target);
         return 0;
+    }
+
+    private static com.jsrc.app.parser.SourceReader.ReadResult findMethodRead(
+            CodeParser parser, com.jsrc.app.parser.SourceReader reader,
+            List<Path> javaFiles, com.jsrc.app.util.MethodResolver.MethodRef ref) {
+        // Try SourceReader first (searches all files by class+method name)
+        var result = reader.readMethod(javaFiles, ref.className(), ref.methodName());
+        if (result != null && ref.hasParamTypes()) {
+            // Verify param types match
+            Path file = findFileForClass(javaFiles, ref.className());
+            if (file != null) {
+                var methods = com.jsrc.app.util.MethodResolver.filter(
+                        parser.findMethods(file, ref.methodName()), ref);
+                if (!methods.isEmpty()) {
+                    MethodInfo m = methods.getFirst();
+                    return new com.jsrc.app.parser.SourceReader.ReadResult(
+                            m.className(), m.name(), file,
+                            m.startLine(), m.endLine(), m.content());
+                }
+                return null; // param types didn't match
+            }
+        }
+        return result;
+    }
+
+    private static com.jsrc.app.parser.SourceReader.ReadResult findMethodReadAllFiles(
+            CodeParser parser, List<Path> javaFiles,
+            com.jsrc.app.util.MethodResolver.MethodRef ref) {
+        for (Path file : javaFiles) {
+            List<MethodInfo> methods = parser.findMethods(file, ref.methodName());
+            methods = com.jsrc.app.util.MethodResolver.filter(methods, ref);
+            if (!methods.isEmpty()) {
+                MethodInfo m = methods.getFirst();
+                return new com.jsrc.app.parser.SourceReader.ReadResult(
+                        m.className(), m.name(), file,
+                        m.startLine(), m.endLine(), m.content());
+            }
+        }
+        return null;
     }
 
     private static Path findFileForClass(List<Path> files, String className) {

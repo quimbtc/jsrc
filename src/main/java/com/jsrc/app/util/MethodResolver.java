@@ -31,8 +31,12 @@ public final class MethodResolver {
             return className != null && !className.isEmpty();
         }
 
+        /**
+         * True if param types were specified (including empty parens for zero-arg methods).
+         * null = no parens specified, List.of() = explicitly zero params.
+         */
         public boolean hasParamTypes() {
-            return paramTypes != null && !paramTypes.isEmpty();
+            return paramTypes != null;
         }
     }
 
@@ -54,11 +58,15 @@ public final class MethodResolver {
         if (parenStart >= 0) {
             int parenEnd = methodPart.indexOf(')', parenStart);
             if (parenEnd > parenStart + 1) {
+                // process(int,String) → ["int", "String"]
                 String paramsStr = methodPart.substring(parenStart + 1, parenEnd);
                 paramTypes = Arrays.stream(paramsStr.split(","))
                         .map(String::trim)
                         .filter(s -> !s.isEmpty())
                         .toList();
+            } else {
+                // process() → explicitly 0 params
+                paramTypes = List.of();
             }
             methodPart = methodPart.substring(0, parenStart);
         }
