@@ -21,19 +21,25 @@ import com.jsrc.app.parser.model.MethodReference;
 public class JsonFormatter implements OutputFormatter {
 
     private final boolean signatureOnly;
+    private final java.util.Set<String> fields;
 
     public JsonFormatter() {
-        this(false);
+        this(false, null);
     }
 
     public JsonFormatter(boolean signatureOnly) {
+        this(signatureOnly, null);
+    }
+
+    public JsonFormatter(boolean signatureOnly, java.util.Set<String> fields) {
         this.signatureOnly = signatureOnly;
+        this.fields = fields;
     }
 
     @Override
     public void printMethods(List<MethodInfo> methods, Path file, String methodName) {
         List<Map<String, Object>> items = methods.stream()
-                .map(m -> methodToMap(m, file))
+                .map(m -> FieldsFilter.filter(methodToMap(m, file), fields))
                 .toList();
         System.out.println(JsonWriter.toJson(items));
     }
@@ -164,7 +170,7 @@ public class JsonFormatter implements OutputFormatter {
     @Override
     public void printClasses(List<ClassInfo> classes, Path sourceRoot) {
         List<Map<String, Object>> items = classes.stream()
-                .map(this::classToCompactMap)
+                .map(ci -> FieldsFilter.filter(classToCompactMap(ci), fields))
                 .toList();
         System.out.println(JsonWriter.toJson(items));
     }

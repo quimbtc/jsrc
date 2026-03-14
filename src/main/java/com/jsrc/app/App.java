@@ -38,6 +38,15 @@ public class App {
         boolean signatureOnly = argList.remove("--signature-only");
         boolean showMetrics = argList.remove("--metrics");
 
+        // Extract --fields <list>
+        java.util.Set<String> fields = null;
+        int fieldsIdx = argList.indexOf("--fields");
+        if (fieldsIdx >= 0 && fieldsIdx + 1 < argList.size()) {
+            fields = com.jsrc.app.output.FieldsFilter.parseFields(argList.get(fieldsIdx + 1));
+            argList.remove(fieldsIdx + 1);
+            argList.remove(fieldsIdx);
+        }
+
         // Extract --config <path> if present
         String configPath = null;
         int configIdx = argList.indexOf("--config");
@@ -47,7 +56,7 @@ public class App {
             argList.remove(configIdx);
         }
 
-        OutputFormatter formatter = OutputFormatter.create(jsonOutput, signatureOnly);
+        OutputFormatter formatter = OutputFormatter.create(jsonOutput, signatureOnly, fields);
 
         // Try loading project config
         com.jsrc.app.config.ProjectConfig config = configPath != null

@@ -96,12 +96,20 @@ public interface OutputFormatter {
 
     /**
      * Factory method with signature-only option.
-     *
-     * @param json          true for JSON output, false for human-readable text
-     * @param signatureOnly true to emit only method signatures (no bodies, annotations, etc.)
-     * @return formatter instance
      */
     static OutputFormatter create(boolean json, boolean signatureOnly) {
-        return json ? new JsonFormatter(signatureOnly) : new TextFormatter(signatureOnly);
+        return create(json, signatureOnly, null);
+    }
+
+    /**
+     * Factory method with signature-only and fields options.
+     *
+     * @param json          true for JSON output, false for human-readable text
+     * @param signatureOnly true to emit only method signatures
+     * @param fields        set of field names to include in JSON (null = all)
+     * @return formatter instance
+     */
+    static OutputFormatter create(boolean json, boolean signatureOnly, java.util.Set<String> fields) {
+        return json ? new JsonFormatter(signatureOnly, fields) : new TextFormatter(signatureOnly);
     }
 }
