@@ -49,7 +49,10 @@ public class App {
         CodeBase project = new JavaCodeBase(rootPath, new CodeBaseLoader());
         List<Path> javaFiles = project.getFiles();
 
-        if ("--overview".equals(command)) {
+        if ("--index".equals(command)) {
+            CodeParser parser = new HybridJavaParser();
+            runIndex(parser, javaFiles, rootPath);
+        } else if ("--overview".equals(command)) {
             CodeParser parser = new HybridJavaParser();
             runOverview(parser, javaFiles, rootPath, formatter);
         } else if ("--deps".equals(command)) {
@@ -120,6 +123,7 @@ public class App {
     private static void printUsage() {
         System.err.println("Usage:");
         System.err.println("  jsrc <source-root> <method-name> [--json]                    Search for methods");
+        System.err.println("  jsrc <source-root> --index                                  Build/update persistent index");
         System.err.println("  jsrc <source-root> --overview [--json]                       Codebase overview (files, classes, packages)");
         System.err.println("  jsrc <source-root> --deps <class> [--json]                   Class dependencies (imports, fields, ctor params)");
         System.err.println("  jsrc <source-root> --implements <iface> [--json]             Find implementors of an interface");
@@ -129,6 +133,24 @@ public class App {
         System.err.println("  jsrc <source-root> --classes [--json]                        List all classes");
         System.err.println("  jsrc <source-root> --smells [--json]                         Detect code smells");
         System.err.println("  jsrc <source-root> --call-chain <method> [outdir] [--json]   Generate call chain diagrams");
+    }
+
+    private static void runIndex(CodeParser parser, List<Path> javaFiles, String rootPath) {
+        Path root = Paths.get(rootPath);
+        System.err.printf("Indexing %d Java files under '%s'...%n", javaFiles.size(), rootPath);
+
+        var existing = com.jsrc.app.index.CodebaseIndex.load(root);
+        var index = new com.jsrc.app.index.CodebaseIndex();
+        int reindexed = index.build(parser, javaFiles, root, existing);
+
+        try {
+            index.save(root);
+            System.err.printf("Done. Indexed %d files (%d re-indexed, %d cached).%n",
+                    javaFiles.size(), reindexed, javaFiles.size() - reindexed);
+        } catch (IOException ex) {
+            System.err.printf("Error saving index: %s%n", ex.getMessage());
+            System.exit(1);
+        }
     }
 
     private static void runOverview(CodeParser parser, List<Path> javaFiles,

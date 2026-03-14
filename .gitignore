@@ -353,3 +353,4 @@ target/
 .dolt/
 *.db
 .beads/
+.jsrc/
