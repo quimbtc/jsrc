@@ -1,4 +1,4 @@
-# JavaUtil — Agent Rules
+# jsrc — Agent Rules
 
 ## Language
 
