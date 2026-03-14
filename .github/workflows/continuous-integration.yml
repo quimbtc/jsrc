@@ -20,6 +20,17 @@ jobs:
           distribution: 'temurin'
           java-version: '22'
           cache: 'maven'
+      - name: Install Tree-sitter native libraries
+        run: |
+          git clone --depth 1 https://github.com/tree-sitter/tree-sitter.git /tmp/tree-sitter
+          cd /tmp/tree-sitter
+          make -j$(nproc)
+          sudo make install PREFIX=/usr/local
+          git clone --depth 1 https://github.com/tree-sitter/tree-sitter-java.git /tmp/tree-sitter-java
+          cd /tmp/tree-sitter-java
+          cc -shared -fPIC -Isrc src/parser.c -o libtree-sitter-java.so
+          sudo cp libtree-sitter-java.so /usr/local/lib/
+          sudo ldconfig
       - name: Build with Maven
         run: mvn package -Djava.library.path=/usr/local/lib
         env:
