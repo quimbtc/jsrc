@@ -73,6 +73,18 @@ public class App {
             return;
         }
 
+        // Validate inputs
+        String pathError = com.jsrc.app.util.InputValidator.validatePath(rootPath, "Source root");
+        if (pathError != null) {
+            System.err.println("Error: " + pathError);
+            System.exit(ExitCode.BAD_USAGE);
+        }
+        String cmdError = com.jsrc.app.util.InputValidator.validateCommand(command);
+        if (cmdError != null) {
+            System.err.println("Error: " + cmdError);
+            System.exit(ExitCode.BAD_USAGE);
+        }
+
         CodeBase project = new JavaCodeBase(rootPath, new CodeBaseLoader());
         List<Path> javaFiles = project.getFiles();
 
@@ -98,7 +110,7 @@ public class App {
                 printUsage();
                 System.exit(ExitCode.BAD_USAGE);
             }
-            String className = argList.get(2);
+            String className = validateArg(argList.get(2), "Class name");
             resultCount[0] = runDependencyAnalysis(javaFiles, className, formatter);
         } else if ("--implements".equals(command)) {
             if (argList.size() < 3) {
@@ -106,7 +118,7 @@ public class App {
                 printUsage();
                 System.exit(ExitCode.BAD_USAGE);
             }
-            String ifaceName = argList.get(2);
+            String ifaceName = validateArg(argList.get(2), "Interface name");
             resultCount[0] = runImplements(indexedCodebase, javaFiles, ifaceName, formatter);
         } else if ("--hierarchy".equals(command)) {
             if (argList.size() < 3) {
@@ -114,7 +126,7 @@ public class App {
                 printUsage();
                 System.exit(ExitCode.BAD_USAGE);
             }
-            String className = argList.get(2);
+            String className = validateArg(argList.get(2), "Class name");
             resultCount[0] = runHierarchy(indexedCodebase, javaFiles, className, formatter);
         } else if ("--summary".equals(command)) {
             if (argList.size() < 3) {
@@ -122,7 +134,7 @@ public class App {
                 printUsage();
                 System.exit(ExitCode.BAD_USAGE);
             }
-            String className = argList.get(2);
+            String className = validateArg(argList.get(2), "Class name");
             resultCount[0] = runClassSummary(indexedCodebase, javaFiles, rootPath, className, formatter);
         } else if ("--annotations".equals(command)) {
             if (argList.size() < 3) {
@@ -130,7 +142,7 @@ public class App {
                 printUsage();
                 System.exit(ExitCode.BAD_USAGE);
             }
-            String annotationName = argList.get(2);
+            String annotationName = validateArg(argList.get(2), "Annotation name");
             resultCount[0] = runAnnotationSearch(indexedCodebase, javaFiles, rootPath, annotationName, formatter);
         } else if ("--classes".equals(command)) {
             resultCount[0] = runClassListing(indexedCodebase, javaFiles, rootPath, formatter);
@@ -143,7 +155,7 @@ public class App {
                 printUsage();
                 System.exit(ExitCode.BAD_USAGE);
             }
-            String methodName = argList.get(2);
+            String methodName = validateArg(argList.get(2), "Method name");
             String outputDir = argList.size() >= 4 ? argList.get(3) : "./call-chains";
             resultCount[0] = runCallChainAnalysis(javaFiles, rootPath, methodName, outputDir, formatter);
         } else {
@@ -165,6 +177,15 @@ public class App {
         if (resultCount[0] == 0 && !"--index".equals(command)) {
             System.exit(ExitCode.NOT_FOUND);
         }
+    }
+
+    private static String validateArg(String value, String label) {
+        String error = com.jsrc.app.util.InputValidator.validateIdentifier(value, label);
+        if (error != null) {
+            System.err.println("Error: " + error);
+            System.exit(ExitCode.BAD_USAGE);
+        }
+        return value;
     }
 
     private static String resolveRoot(com.jsrc.app.config.ProjectConfig config) {
