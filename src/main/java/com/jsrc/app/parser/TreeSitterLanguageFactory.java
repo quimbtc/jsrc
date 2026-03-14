@@ -32,11 +32,17 @@ public final class TreeSitterLanguageFactory {
             "%s"
     };
 
-    private static final String[] SYSTEM_LIB_DIRS = {
-            "/usr/local/lib",
-            "/usr/lib",
-            "/lib"
-    };
+    private static final String[] SYSTEM_LIB_DIRS = buildSystemLibDirs();
+
+    private static String[] buildSystemLibDirs() {
+        String userHome = System.getProperty("user.home", "");
+        return new String[] {
+                userHome + "/lib",
+                "/usr/local/lib",
+                "/usr/lib",
+                "/lib"
+        };
+    }
 
     private TreeSitterLanguageFactory() {}
 

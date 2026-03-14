@@ -348,3 +348,7 @@ ASALocalRun/
 *.DS_Store
 
 target/
+
+# Dolt database files (added by bd init)
+.dolt/
+*.db
