@@ -42,6 +42,11 @@ public interface OutputFormatter {
     void printClasses(List<ClassInfo> classes, Path sourceRoot);
 
     /**
+     * Prints diff results (changed files since last index).
+     */
+    void printDiff(List<String> modified, List<String> added, List<String> deleted);
+
+    /**
      * Prints caller/callee results.
      *
      * @param refs   list of method references (callers or callees)

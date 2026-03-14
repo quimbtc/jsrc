@@ -69,6 +69,16 @@ public class JsonFormatter implements OutputFormatter {
     }
 
     @Override
+    public void printDiff(List<String> modified, List<String> added, List<String> deleted) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("modified", modified);
+        map.put("added", added);
+        map.put("deleted", deleted);
+        map.put("totalChanges", modified.size() + added.size() + deleted.size());
+        System.out.println(JsonWriter.toJson(map));
+    }
+
+    @Override
     public void printRefs(List<Map<String, Object>> refs, String label, String target) {
         System.out.println(JsonWriter.toJson(refs));
     }

@@ -125,11 +125,16 @@ public class App {
             javaFiles = filterExcludes(javaFiles, config.excludes());
         }
 
-        // Try loading index for full-parse commands (auto-refreshes stale entries)
-        var indexedCodebase = com.jsrc.app.index.IndexedCodebase.tryLoad(Paths.get(rootPath), javaFiles);
-
         var timer = com.jsrc.app.util.StopWatch.start();
         int[] resultCount = {0}; // mutable counter for lambdas
+
+        // --diff must read raw index BEFORE auto-refresh
+        if ("--diff".equals(command)) {
+            resultCount[0] = runDiff(javaFiles, rootPath, formatter);
+        } else {
+
+        // Try loading index for full-parse commands (auto-refreshes stale entries)
+        var indexedCodebase = com.jsrc.app.index.IndexedCodebase.tryLoad(Paths.get(rootPath), javaFiles);
 
         if ("--callers".equals(command)) {
             if (argList.size() < 3) {
@@ -220,6 +225,8 @@ public class App {
             resultCount[0] = runMethodSearch(parser, javaFiles, rootPath, command, formatter);
         }
 
+        } // end of else block (non-diff commands)
+
         if (showMetrics) {
             var metrics = new com.jsrc.app.output.ExecutionMetrics(
                     command, timer.elapsedMs(), javaFiles.size(), resultCount[0]);
@@ -234,6 +241,52 @@ public class App {
         if (resultCount[0] == 0 && !"--index".equals(command)) {
             System.exit(ExitCode.NOT_FOUND);
         }
+    }
+
+    private static int runDiff(List<Path> javaFiles, String rootPath,
+                                    OutputFormatter formatter) {
+        Path root = Paths.get(rootPath);
+        List<com.jsrc.app.index.IndexEntry> existing = com.jsrc.app.index.CodebaseIndex.load(root);
+        if (existing.isEmpty()) {
+            System.err.println("No index found. Run --index first.");
+            return 0;
+        }
+
+        // Build lookup of indexed files
+        Map<String, com.jsrc.app.index.IndexEntry> byPath = new java.util.HashMap<>();
+        for (var entry : existing) {
+            byPath.put(entry.path(), entry);
+        }
+
+        List<String> modified = new ArrayList<>();
+        List<String> added = new ArrayList<>();
+        java.util.Set<String> currentPaths = new java.util.HashSet<>();
+
+        for (Path file : javaFiles) {
+            String relativePath = root.relativize(file).toString();
+            currentPaths.add(relativePath);
+            var prev = byPath.get(relativePath);
+            if (prev == null) {
+                added.add(relativePath);
+            } else {
+                try {
+                    long currentModified = java.nio.file.Files.getLastModifiedTime(file).toMillis();
+                    if (currentModified > prev.lastModified()) {
+                        modified.add(relativePath);
+                    }
+                } catch (java.io.IOException e) {
+                    modified.add(relativePath);
+                }
+            }
+        }
+
+        List<String> deleted = byPath.keySet().stream()
+                .filter(p -> !currentPaths.contains(p))
+                .sorted()
+                .toList();
+
+        formatter.printDiff(modified, added, deleted);
+        return modified.size() + added.size() + deleted.size();
     }
 
     private static int runCallers(List<Path> javaFiles, String methodName,

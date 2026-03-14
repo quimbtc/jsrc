@@ -70,6 +70,26 @@ public class TextFormatter implements OutputFormatter {
     }
 
     @Override
+    public void printDiff(List<String> modified, List<String> added, List<String> deleted) {
+        if (modified.isEmpty() && added.isEmpty() && deleted.isEmpty()) {
+            System.out.println("No changes since last index.");
+            return;
+        }
+        if (!modified.isEmpty()) {
+            System.out.printf("Modified (%d):%n", modified.size());
+            modified.forEach(f -> System.out.printf("  M %s%n", f));
+        }
+        if (!added.isEmpty()) {
+            System.out.printf("Added (%d):%n", added.size());
+            added.forEach(f -> System.out.printf("  A %s%n", f));
+        }
+        if (!deleted.isEmpty()) {
+            System.out.printf("Deleted (%d):%n", deleted.size());
+            deleted.forEach(f -> System.out.printf("  D %s%n", f));
+        }
+    }
+
+    @Override
     public void printRefs(List<Map<String, Object>> refs, String label, String target) {
         if (refs.isEmpty()) {
             System.out.printf("No %s found for '%s'.%n", label, target);
