@@ -56,6 +56,23 @@ public class App {
             argList.remove(configIdx);
         }
 
+        // Handle --describe before normal dispatch (doesn't need source root)
+        if (argList.contains("--describe")) {
+            argList.remove("--describe");
+            if (argList.isEmpty()) {
+                CommandRegistry.describeAll(jsonOutput);
+            } else {
+                String target = argList.getFirst();
+                if (!target.startsWith("--")) target = "--" + target;
+                if (!CommandRegistry.describeCommand(target, jsonOutput)) {
+                    System.err.println("Unknown command: " + target);
+                    CommandRegistry.describeAll(jsonOutput);
+                    System.exit(ExitCode.BAD_USAGE);
+                }
+            }
+            return;
+        }
+
         OutputFormatter formatter = OutputFormatter.create(jsonOutput, signatureOnly, fields);
 
         // Try loading project config
