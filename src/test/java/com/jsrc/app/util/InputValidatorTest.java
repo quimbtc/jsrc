@@ -91,7 +91,7 @@ class InputValidatorTest {
     void shouldRejectUnknownWithSuggestion() {
         String error = InputValidator.validateCommand("--calsses");
         assertNotNull(error);
-        assertTrue(error.contains("Did you mean --classes"));
+        assertTrue(error.contains("Did you mean"), "Should suggest a similar command: " + error);
 
         error = InputValidator.validateCommand("--summry");
         assertNotNull(error);

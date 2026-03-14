@@ -23,6 +23,10 @@ public final class CommandRegistry {
     ) {}
 
     private static final List<CommandDef> COMMANDS = List.of(
+            new CommandDef("--callers", "Find all methods that call a given method",
+                    List.of("<methodName>"), List.of("--json", "--metrics"), "array"),
+            new CommandDef("--callees", "Find all methods called by a given method",
+                    List.of("<methodName>"), List.of("--json", "--metrics"), "array"),
             new CommandDef("--read", "Read source code of a class or method",
                     List.of("<Class> or <Class.method>"), List.of("--json", "--fields", "--metrics"), "object"),
             new CommandDef("--index", "Build or update the persistent codebase index",

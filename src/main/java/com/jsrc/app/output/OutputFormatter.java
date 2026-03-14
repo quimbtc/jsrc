@@ -2,6 +2,7 @@ package com.jsrc.app.output;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 
 import com.jsrc.app.parser.model.CallChain;
 import com.jsrc.app.parser.model.ClassInfo;
@@ -39,6 +40,15 @@ public interface OutputFormatter {
      * @param sourceRoot source root for relative paths
      */
     void printClasses(List<ClassInfo> classes, Path sourceRoot);
+
+    /**
+     * Prints caller/callee results.
+     *
+     * @param refs   list of method references (callers or callees)
+     * @param label  "callers" or "callees"
+     * @param target the queried method name
+     */
+    void printRefs(List<Map<String, Object>> refs, String label, String target);
 
     /**
      * Prints source read result.

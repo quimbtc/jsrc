@@ -69,6 +69,11 @@ public class JsonFormatter implements OutputFormatter {
     }
 
     @Override
+    public void printRefs(List<Map<String, Object>> refs, String label, String target) {
+        System.out.println(JsonWriter.toJson(refs));
+    }
+
+    @Override
     public void printReadResult(com.jsrc.app.parser.SourceReader.ReadResult result) {
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("className", result.className());

@@ -131,7 +131,23 @@ public class App {
         var timer = com.jsrc.app.util.StopWatch.start();
         int[] resultCount = {0}; // mutable counter for lambdas
 
-        if ("--read".equals(command)) {
+        if ("--callers".equals(command)) {
+            if (argList.size() < 3) {
+                System.err.println("Error: --callers requires a method name");
+                printUsage();
+                System.exit(ExitCode.BAD_USAGE);
+            }
+            String methodName = validateArg(argList.get(2), "Method name");
+            resultCount[0] = runCallers(javaFiles, methodName, formatter);
+        } else if ("--callees".equals(command)) {
+            if (argList.size() < 3) {
+                System.err.println("Error: --callees requires a method name");
+                printUsage();
+                System.exit(ExitCode.BAD_USAGE);
+            }
+            String methodName = validateArg(argList.get(2), "Method name");
+            resultCount[0] = runCallees(javaFiles, methodName, formatter);
+        } else if ("--read".equals(command)) {
             if (argList.size() < 3) {
                 System.err.println("Error: --read requires Class or Class.method");
                 printUsage();
@@ -218,6 +234,48 @@ public class App {
         if (resultCount[0] == 0 && !"--index".equals(command)) {
             System.exit(ExitCode.NOT_FOUND);
         }
+    }
+
+    private static int runCallers(List<Path> javaFiles, String methodName,
+                                      OutputFormatter formatter) {
+        CallGraphBuilder graphBuilder = new CallGraphBuilder();
+        graphBuilder.build(javaFiles);
+
+        var targets = graphBuilder.findMethodsByName(methodName);
+        List<Map<String, Object>> callers = new ArrayList<>();
+        for (var target : targets) {
+            for (var call : graphBuilder.getCallersOf(target)) {
+                Map<String, Object> ref = new java.util.LinkedHashMap<>();
+                ref.put("className", call.caller().className());
+                ref.put("methodName", call.caller().methodName());
+                ref.put("line", call.line());
+                callers.add(ref);
+            }
+        }
+
+        formatter.printRefs(callers, "Callers", methodName);
+        return callers.size();
+    }
+
+    private static int runCallees(List<Path> javaFiles, String methodName,
+                                      OutputFormatter formatter) {
+        CallGraphBuilder graphBuilder = new CallGraphBuilder();
+        graphBuilder.build(javaFiles);
+
+        var sources = graphBuilder.findMethodsByName(methodName);
+        List<Map<String, Object>> callees = new ArrayList<>();
+        for (var source : sources) {
+            for (var call : graphBuilder.getCalleesOf(source)) {
+                Map<String, Object> ref = new java.util.LinkedHashMap<>();
+                ref.put("className", call.callee().className());
+                ref.put("methodName", call.callee().methodName());
+                ref.put("line", call.line());
+                callees.add(ref);
+            }
+        }
+
+        formatter.printRefs(callees, "Callees", methodName);
+        return callees.size();
     }
 
     private static int runRead(CodeParser parser, List<Path> javaFiles,

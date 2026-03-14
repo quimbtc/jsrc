@@ -2,6 +2,7 @@ package com.jsrc.app.output;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 
 import com.jsrc.app.parser.model.CallChain;
 import com.jsrc.app.parser.model.ClassInfo;
@@ -65,6 +66,19 @@ public class TextFormatter implements OutputFormatter {
                     smell.severity(), smell.ruleId(), smell.line(),
                     smell.methodName().isEmpty() ? smell.className() : smell.methodName() + "()",
                     smell.message());
+        }
+    }
+
+    @Override
+    public void printRefs(List<Map<String, Object>> refs, String label, String target) {
+        if (refs.isEmpty()) {
+            System.out.printf("No %s found for '%s'.%n", label, target);
+            return;
+        }
+        System.out.printf("%s of '%s' (%d):%n", label, target, refs.size());
+        for (Map<String, Object> ref : refs) {
+            System.out.printf("  %s.%s() [line %s]%n",
+                    ref.get("className"), ref.get("methodName"), ref.get("line"));
         }
     }
 
