@@ -7,6 +7,7 @@ import java.util.Map;
 
 import com.jsrc.app.parser.model.AnnotationInfo;
 import com.jsrc.app.parser.model.CallChain;
+import com.jsrc.app.parser.model.ClassInfo;
 import com.jsrc.app.parser.model.CodeSmell;
 import com.jsrc.app.parser.model.MethodCall;
 import com.jsrc.app.parser.model.MethodInfo;
@@ -52,6 +53,14 @@ public class JsonFormatter implements OutputFormatter {
     }
 
     @Override
+    public void printClasses(List<ClassInfo> classes, Path sourceRoot) {
+        List<Map<String, Object>> items = classes.stream()
+                .map(this::classToCompactMap)
+                .toList();
+        System.out.println(JsonWriter.toJson(items));
+    }
+
+    @Override
     public void printCallChains(List<CallChain> chains, String methodName) {
         List<Map<String, Object>> items = chains.stream()
                 .map(this::chainToMap)
@@ -60,6 +69,30 @@ public class JsonFormatter implements OutputFormatter {
     }
 
     // ---- serialization helpers ----
+
+    private Map<String, Object> classToCompactMap(ClassInfo ci) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("name", ci.name());
+        map.put("packageName", ci.packageName());
+        map.put("qualifiedName", ci.qualifiedName());
+        map.put("startLine", ci.startLine());
+        map.put("endLine", ci.endLine());
+        map.put("modifiers", ci.modifiers());
+        map.put("isInterface", ci.isInterface());
+        map.put("isAbstract", ci.isAbstract());
+        map.put("methodCount", ci.methods().size());
+        if (!ci.superClass().isEmpty()) {
+            map.put("superClass", ci.superClass());
+        }
+        if (!ci.interfaces().isEmpty()) {
+            map.put("interfaces", ci.interfaces());
+        }
+        if (!ci.annotations().isEmpty()) {
+            map.put("annotations", ci.annotations().stream()
+                    .map(this::annotationToMap).toList());
+        }
+        return map;
+    }
 
     private Map<String, Object> methodToMap(MethodInfo m, Path file) {
         Map<String, Object> map = new LinkedHashMap<>();

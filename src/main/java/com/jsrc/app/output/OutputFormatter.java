@@ -4,6 +4,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 import com.jsrc.app.parser.model.CallChain;
+import com.jsrc.app.parser.model.ClassInfo;
 import com.jsrc.app.parser.model.CodeSmell;
 import com.jsrc.app.parser.model.MethodInfo;
 
@@ -30,6 +31,14 @@ public interface OutputFormatter {
      * @param file   source file path
      */
     void printSmells(List<CodeSmell> smells, Path file);
+
+    /**
+     * Prints class listing results.
+     *
+     * @param classes discovered classes
+     * @param sourceRoot source root for relative paths
+     */
+    void printClasses(List<ClassInfo> classes, Path sourceRoot);
 
     /**
      * Prints call chain analysis results.

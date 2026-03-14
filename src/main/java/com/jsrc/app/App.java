@@ -16,6 +16,7 @@ import com.jsrc.app.parser.CodeParser;
 import com.jsrc.app.parser.HybridJavaParser;
 import com.jsrc.app.parser.MermaidDiagramGenerator;
 import com.jsrc.app.parser.model.CallChain;
+import com.jsrc.app.parser.model.ClassInfo;
 import com.jsrc.app.parser.model.CodeSmell;
 import com.jsrc.app.parser.model.MethodInfo;
 
@@ -40,7 +41,10 @@ public class App {
         CodeBase project = new JavaCodeBase(rootPath, new CodeBaseLoader());
         List<Path> javaFiles = project.getFiles();
 
-        if ("--smells".equals(command)) {
+        if ("--classes".equals(command)) {
+            CodeParser parser = new HybridJavaParser();
+            runClassListing(parser, javaFiles, rootPath, formatter);
+        } else if ("--smells".equals(command)) {
             CodeParser parser = new HybridJavaParser();
             runSmellDetection(parser, javaFiles, rootPath, formatter);
         } else if ("--call-chain".equals(command)) {
@@ -61,8 +65,23 @@ public class App {
     private static void printUsage() {
         System.err.println("Usage:");
         System.err.println("  jsrc <source-root> <method-name> [--json]                    Search for methods");
+        System.err.println("  jsrc <source-root> --classes [--json]                        List all classes");
         System.err.println("  jsrc <source-root> --smells [--json]                         Detect code smells");
         System.err.println("  jsrc <source-root> --call-chain <method> [outdir] [--json]   Generate call chain diagrams");
+    }
+
+    private static void runClassListing(CodeParser parser, List<Path> javaFiles,
+                                          String rootPath, OutputFormatter formatter) {
+        System.err.printf("Scanning %d Java files under '%s' for classes...%n",
+                javaFiles.size(), rootPath);
+
+        List<ClassInfo> allClasses = new ArrayList<>();
+        for (Path file : javaFiles) {
+            allClasses.addAll(parser.parseClasses(file));
+        }
+
+        formatter.printClasses(allClasses, Path.of(rootPath));
+        System.err.printf("Found %d type(s).%n", allClasses.size());
     }
 
     private static void runSmellDetection(CodeParser parser, List<Path> javaFiles,

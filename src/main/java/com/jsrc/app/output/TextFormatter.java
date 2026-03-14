@@ -4,6 +4,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 import com.jsrc.app.parser.model.CallChain;
+import com.jsrc.app.parser.model.ClassInfo;
 import com.jsrc.app.parser.model.CodeSmell;
 import com.jsrc.app.parser.model.MethodCall;
 import com.jsrc.app.parser.model.MethodInfo;
@@ -50,6 +51,23 @@ public class TextFormatter implements OutputFormatter {
                     smell.methodName().isEmpty() ? smell.className() : smell.methodName() + "()",
                     smell.message());
         }
+    }
+
+    @Override
+    public void printClasses(List<ClassInfo> classes, Path sourceRoot) {
+        if (classes.isEmpty()) {
+            System.out.println("No classes found.");
+            return;
+        }
+        for (ClassInfo ci : classes) {
+            String kind = ci.isInterface() ? "interface" : ci.isAbstract() ? "abstract class" : "class";
+            System.out.printf("  %s %s (%s) [%d methods] lines %d-%d%n",
+                    kind, ci.qualifiedName(),
+                    String.join(" ", ci.modifiers()),
+                    ci.methods().size(),
+                    ci.startLine(), ci.endLine());
+        }
+        System.out.printf("%nTotal: %d type(s).%n", classes.size());
     }
 
     @Override
