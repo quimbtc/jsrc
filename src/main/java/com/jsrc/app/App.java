@@ -163,7 +163,7 @@ public class App {
                 System.exit(ExitCode.BAD_USAGE);
             }
             String className = validateArg(argList.get(2), "Interface name");
-            resultCount[0] = runContract(javaFiles, rootPath, className, formatter);
+            resultCount[0] = runContract(indexedCodebase, javaFiles, rootPath, className, formatter);
         } else if ("--context".equals(command)) {
             if (argList.size() < 3) {
                 System.err.println("Error: --context requires a class name");
@@ -372,19 +372,17 @@ public class App {
         try {
             var spec = com.jsrc.app.spec.SpecParser.parse(Path.of(specPath));
             CodeParser parser = new HybridJavaParser();
-            for (Path file : javaFiles) {
-                for (ClassInfo ci : parser.parseClasses(file)) {
-                    if (ci.name().equals(className) || ci.qualifiedName().equals(className)) {
-                        var result = com.jsrc.app.spec.SpecVerifier.verify(ci, spec);
-                        System.out.println(com.jsrc.app.output.JsonWriter.toJson(result));
-                        @SuppressWarnings("unchecked")
-                        List<?> discs = (List<?>) result.get("discrepancies");
-                        return discs.size();
-                    }
-                }
-            }
-            System.err.printf("Class '%s' not found.%n", className);
-            return 0;
+            List<ClassInfo> allClasses = new ArrayList<>();
+            for (Path file : javaFiles) allClasses.addAll(parser.parseClasses(file));
+
+            ClassInfo ci = resolveClass(allClasses, className);
+            if (ci == null) return 0;
+
+            var result = com.jsrc.app.spec.SpecVerifier.verify(ci, spec);
+            System.out.println(com.jsrc.app.output.JsonWriter.toJson(result));
+            @SuppressWarnings("unchecked")
+            List<?> discs = (List<?>) result.get("discrepancies");
+            return discs.size();
         } catch (java.io.IOException e) {
             System.err.printf("Error reading spec: %s%n", e.getMessage());
             System.exit(ExitCode.IO_ERROR);
@@ -392,19 +390,14 @@ public class App {
         }
     }
 
-    private static int runContract(List<Path> javaFiles, String rootPath,
+    private static int runContract(com.jsrc.app.index.IndexedCodebase indexed,
+                                        List<Path> javaFiles, String rootPath,
                                         String className, OutputFormatter formatter) {
-        CodeParser parser = new HybridJavaParser();
-        for (Path file : javaFiles) {
-            for (ClassInfo ci : parser.parseClasses(file)) {
-                if (ci.name().equals(className) || ci.qualifiedName().equals(className)) {
-                    formatter.printClassSummary(ci, file);
-                    return 1;
-                }
-            }
-        }
-        System.err.printf("'%s' not found.%n", className);
-        return 0;
+        List<ClassInfo> allClasses = getAllClasses(indexed, javaFiles);
+        ClassInfo ci = resolveClass(allClasses, className);
+        if (ci == null) return 0;
+        formatter.printClassSummary(ci, Path.of(""));
+        return 1;
     }
 
     private static int runContext(List<Path> javaFiles, String rootPath,
@@ -413,19 +406,18 @@ public class App {
                                        OutputFormatter formatter,
                                        boolean mdOutput) {
         CodeParser parser = new HybridJavaParser();
-
-        // Need all classes for hierarchy resolution
         List<ClassInfo> allClasses = new ArrayList<>();
         for (Path file : javaFiles) allClasses.addAll(parser.parseClasses(file));
 
+        // Resolve with disambiguation
+        ClassInfo resolved = resolveClass(allClasses, className);
+        if (resolved == null) return 0;
+
         var arch = config != null ? config.architecture() : null;
         var assembler = new com.jsrc.app.parser.ContextAssembler(parser);
-        Map<String, Object> ctx = assembler.assemble(javaFiles, className, allClasses, arch);
+        Map<String, Object> ctx = assembler.assemble(javaFiles, resolved.name(), allClasses, arch);
 
-        if (ctx == null) {
-            System.err.printf("Class '%s' not found.%n", className);
-            return 0;
-        }
+        if (ctx == null) return 0;
 
         if (mdOutput) {
             System.out.println(com.jsrc.app.output.MarkdownFormatter.toMarkdown(ctx));
@@ -674,6 +666,34 @@ public class App {
         return 0;
     }
 
+    private static List<ClassInfo> getAllClasses(com.jsrc.app.index.IndexedCodebase indexed,
+                                                    List<Path> javaFiles) {
+        if (indexed != null) return indexed.getAllClasses();
+        CodeParser parser = new HybridJavaParser();
+        List<ClassInfo> all = new ArrayList<>();
+        for (Path file : javaFiles) all.addAll(parser.parseClasses(file));
+        return all;
+    }
+
+    /**
+     * Resolves a class name, handling ambiguity. Returns the ClassInfo or exits.
+     */
+    private static ClassInfo resolveClass(List<ClassInfo> allClasses, String className) {
+        var resolution = com.jsrc.app.util.ClassResolver.resolve(allClasses, className);
+        return switch (resolution) {
+            case com.jsrc.app.util.ClassResolver.Resolution.Found found -> found.classInfo();
+            case com.jsrc.app.util.ClassResolver.Resolution.Ambiguous ambiguous -> {
+                com.jsrc.app.util.ClassResolver.printAmbiguous(ambiguous.candidates(), className);
+                System.exit(ExitCode.BAD_USAGE);
+                yield null;
+            }
+            case com.jsrc.app.util.ClassResolver.Resolution.NotFound notFound -> {
+                System.err.printf("Class '%s' not found.%n", className);
+                yield null;
+            }
+        };
+    }
+
     private static String sha256(byte[] data) {
         try {
             var digest = java.security.MessageDigest.getInstance("SHA-256");
@@ -833,26 +853,9 @@ public class App {
     private static int runHierarchy(com.jsrc.app.index.IndexedCodebase indexed,
                                        List<Path> javaFiles, String className,
                                        OutputFormatter formatter) {
-        List<ClassInfo> allClasses;
-        if (indexed != null) {
-            allClasses = indexed.getAllClasses();
-        } else {
-            CodeParser parser = new HybridJavaParser();
-            allClasses = new ArrayList<>();
-            for (Path file : javaFiles) {
-                allClasses.addAll(parser.parseClasses(file));
-            }
-        }
-
-        // Find target class
-        ClassInfo target = allClasses.stream()
-                .filter(ci -> ci.name().equals(className) || ci.qualifiedName().equals(className))
-                .findFirst().orElse(null);
-
-        if (target == null) {
-            System.err.printf("Class '%s' not found.%n", className);
-            return 0;
-        }
+        List<ClassInfo> allClasses = getAllClasses(indexed, javaFiles);
+        ClassInfo target = resolveClass(allClasses, className);
+        if (target == null) return 0;
 
         // Find subclasses (classes that extend target)
         List<String> subClasses = allClasses.stream()
@@ -930,28 +933,13 @@ public class App {
     private static int runClassSummary(com.jsrc.app.index.IndexedCodebase indexed,
                                           List<Path> javaFiles, String rootPath,
                                           String className, OutputFormatter formatter) {
-        if (indexed != null) {
-            for (ClassInfo ci : indexed.getAllClasses()) {
-                if (ci.name().equals(className) || ci.qualifiedName().equals(className)) {
-                    String filePath = indexed.findFileForClass(className);
-                    formatter.printClassSummary(ci, Path.of(filePath != null ? filePath : ""));
-                    return 1;
-                }
-            }
-        } else {
-            CodeParser parser = new HybridJavaParser();
-            for (Path file : javaFiles) {
-                List<ClassInfo> classes = parser.parseClasses(file);
-                for (ClassInfo ci : classes) {
-                    if (ci.name().equals(className) || ci.qualifiedName().equals(className)) {
-                        formatter.printClassSummary(ci, file);
-                        return 1;
-                    }
-                }
-            }
-        }
-        System.err.printf("Class '%s' not found.%n", className);
-        return 0;
+        List<ClassInfo> allClasses = getAllClasses(indexed, javaFiles);
+        ClassInfo ci = resolveClass(allClasses, className);
+        if (ci == null) return 0;
+
+        String filePath = indexed != null ? indexed.findFileForClass(ci.name()) : null;
+        formatter.printClassSummary(ci, Path.of(filePath != null ? filePath : ""));
+        return 1;
     }
 
     private static int runClassListing(com.jsrc.app.index.IndexedCodebase indexed,
