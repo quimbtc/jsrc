@@ -79,6 +79,16 @@ jsrc --deps ClassName --json
 jsrc --annotations AnnotationName --json
 ```
 
+### Read source
+
+```bash
+# Read a class source
+jsrc --read ClassName --json
+
+# Read a specific method source
+jsrc --read ClassName.methodName --json
+```
+
 ### Search
 
 ```bash
@@ -89,14 +99,27 @@ jsrc methodName --json
 jsrc methodName --json --signature-only
 ```
 
+### Call graph
+
+```bash
+# Who calls this method?
+jsrc --callers methodName --json
+
+# What does this method call?
+jsrc --callees methodName --json
+
+# Full call chain trace (generates Mermaid diagrams)
+jsrc --call-chain methodName --json
+```
+
 ### Analyze
 
 ```bash
 # Detect code smells
 jsrc --smells --json
 
-# Trace call chains to a method (generates Mermaid diagrams)
-jsrc --call-chain methodName --json
+# What changed since last index?
+jsrc --diff --json
 ```
 
 ### Introspect
