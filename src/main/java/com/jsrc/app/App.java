@@ -69,7 +69,7 @@ public class App {
             command = argList.get(0);
         } else {
             printUsage();
-            System.exit(1);
+            System.exit(ExitCode.BAD_USAGE);
             return;
         }
 
@@ -96,7 +96,7 @@ public class App {
             if (argList.size() < 3) {
                 System.err.println("Error: --deps requires a class name");
                 printUsage();
-                System.exit(1);
+                System.exit(ExitCode.BAD_USAGE);
             }
             String className = argList.get(2);
             resultCount[0] = runDependencyAnalysis(javaFiles, className, formatter);
@@ -104,7 +104,7 @@ public class App {
             if (argList.size() < 3) {
                 System.err.println("Error: --implements requires an interface name");
                 printUsage();
-                System.exit(1);
+                System.exit(ExitCode.BAD_USAGE);
             }
             String ifaceName = argList.get(2);
             resultCount[0] = runImplements(indexedCodebase, javaFiles, ifaceName, formatter);
@@ -112,7 +112,7 @@ public class App {
             if (argList.size() < 3) {
                 System.err.println("Error: --hierarchy requires a class name");
                 printUsage();
-                System.exit(1);
+                System.exit(ExitCode.BAD_USAGE);
             }
             String className = argList.get(2);
             resultCount[0] = runHierarchy(indexedCodebase, javaFiles, className, formatter);
@@ -120,7 +120,7 @@ public class App {
             if (argList.size() < 3) {
                 System.err.println("Error: --summary requires a class name");
                 printUsage();
-                System.exit(1);
+                System.exit(ExitCode.BAD_USAGE);
             }
             String className = argList.get(2);
             resultCount[0] = runClassSummary(indexedCodebase, javaFiles, rootPath, className, formatter);
@@ -128,7 +128,7 @@ public class App {
             if (argList.size() < 3) {
                 System.err.println("Error: --annotations requires an annotation name");
                 printUsage();
-                System.exit(1);
+                System.exit(ExitCode.BAD_USAGE);
             }
             String annotationName = argList.get(2);
             resultCount[0] = runAnnotationSearch(indexedCodebase, javaFiles, rootPath, annotationName, formatter);
@@ -141,7 +141,7 @@ public class App {
             if (argList.size() < 3) {
                 System.err.println("Error: --call-chain requires a method name");
                 printUsage();
-                System.exit(1);
+                System.exit(ExitCode.BAD_USAGE);
             }
             String methodName = argList.get(2);
             String outputDir = argList.size() >= 4 ? argList.get(3) : "./call-chains";
@@ -159,6 +159,11 @@ public class App {
             } else {
                 System.err.println(metrics);
             }
+        }
+
+        // Exit code: 0 = results found, 1 = no results
+        if (resultCount[0] == 0 && !"--index".equals(command)) {
+            System.exit(ExitCode.NOT_FOUND);
         }
     }
 
@@ -216,7 +221,7 @@ public class App {
                     javaFiles.size(), reindexed, javaFiles.size() - reindexed);
         } catch (IOException ex) {
             System.err.printf("Error saving index: %s%n", ex.getMessage());
-            System.exit(1);
+            System.exit(ExitCode.IO_ERROR);
         }
     }
 
@@ -523,7 +528,7 @@ public class App {
                 }
             } catch (IOException ex) {
                 System.err.printf("Error writing diagrams: %s%n", ex.getMessage());
-                System.exit(1);
+                System.exit(ExitCode.IO_ERROR);
             }
         }
         return chains.size();
