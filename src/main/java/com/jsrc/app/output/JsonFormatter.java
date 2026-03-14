@@ -63,6 +63,28 @@ public class JsonFormatter implements OutputFormatter {
     }
 
     @Override
+    public void printDependencies(DependencyResult result) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("className", result.className());
+        map.put("imports", result.imports());
+        map.put("fieldDependencies", result.fieldDependencies().stream()
+                .map(d -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("type", d.type());
+                    m.put("name", d.name());
+                    return m;
+                }).toList());
+        map.put("constructorDependencies", result.constructorDependencies().stream()
+                .map(d -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("type", d.type());
+                    m.put("name", d.name());
+                    return m;
+                }).toList());
+        System.out.println(JsonWriter.toJson(map));
+    }
+
+    @Override
     public void printHierarchy(HierarchyResult result) {
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("target", result.target());

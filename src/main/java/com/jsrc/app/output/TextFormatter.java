@@ -69,6 +69,29 @@ public class TextFormatter implements OutputFormatter {
     }
 
     @Override
+    public void printDependencies(DependencyResult result) {
+        System.out.printf("Dependencies for: %s%n", result.className());
+        if (!result.imports().isEmpty()) {
+            System.out.printf("  Imports (%d):%n", result.imports().size());
+            for (String imp : result.imports()) {
+                System.out.printf("    %s%n", imp);
+            }
+        }
+        if (!result.fieldDependencies().isEmpty()) {
+            System.out.printf("  Fields:%n");
+            for (var dep : result.fieldDependencies()) {
+                System.out.printf("    %s %s%n", dep.type(), dep.name());
+            }
+        }
+        if (!result.constructorDependencies().isEmpty()) {
+            System.out.printf("  Constructor params:%n");
+            for (var dep : result.constructorDependencies()) {
+                System.out.printf("    %s %s%n", dep.type(), dep.name());
+            }
+        }
+    }
+
+    @Override
     public void printHierarchy(HierarchyResult result) {
         System.out.printf("Hierarchy for: %s%n", result.target());
         if (!result.superClass().isEmpty()) {

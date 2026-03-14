@@ -17,6 +17,8 @@ import com.jsrc.app.parser.CodeParser;
 import com.jsrc.app.parser.HybridJavaParser;
 import com.jsrc.app.parser.MermaidDiagramGenerator;
 import com.jsrc.app.output.AnnotationMatch;
+import com.jsrc.app.output.DependencyResult;
+import com.jsrc.app.output.DependencyResult.FieldDep;
 import com.jsrc.app.output.HierarchyResult;
 import com.jsrc.app.parser.model.AnnotationInfo;
 import com.jsrc.app.parser.model.CallChain;
@@ -46,7 +48,15 @@ public class App {
         CodeBase project = new JavaCodeBase(rootPath, new CodeBaseLoader());
         List<Path> javaFiles = project.getFiles();
 
-        if ("--implements".equals(command)) {
+        if ("--deps".equals(command)) {
+            if (argList.size() < 3) {
+                System.err.println("Error: --deps requires a class name");
+                printUsage();
+                System.exit(1);
+            }
+            String className = argList.get(2);
+            runDependencyAnalysis(javaFiles, className, formatter);
+        } else if ("--implements".equals(command)) {
             if (argList.size() < 3) {
                 System.err.println("Error: --implements requires an interface name");
                 printUsage();
@@ -106,6 +116,7 @@ public class App {
     private static void printUsage() {
         System.err.println("Usage:");
         System.err.println("  jsrc <source-root> <method-name> [--json]                    Search for methods");
+        System.err.println("  jsrc <source-root> --deps <class> [--json]                   Class dependencies (imports, fields, ctor params)");
         System.err.println("  jsrc <source-root> --implements <iface> [--json]             Find implementors of an interface");
         System.err.println("  jsrc <source-root> --hierarchy <class> [--json]              Class hierarchy (extends/implements/subclasses)");
         System.err.println("  jsrc <source-root> --summary <class> [--json]                Class summary (signatures only)");
@@ -113,6 +124,47 @@ public class App {
         System.err.println("  jsrc <source-root> --classes [--json]                        List all classes");
         System.err.println("  jsrc <source-root> --smells [--json]                         Detect code smells");
         System.err.println("  jsrc <source-root> --call-chain <method> [outdir] [--json]   Generate call chain diagrams");
+    }
+
+    private static void runDependencyAnalysis(List<Path> javaFiles,
+                                                 String className, OutputFormatter formatter) {
+        var javaParser = new com.github.javaparser.JavaParser();
+        for (Path file : javaFiles) {
+            try {
+                String source = java.nio.file.Files.readString(file);
+                var parseResult = javaParser.parse(source);
+                if (!parseResult.isSuccessful() || parseResult.getResult().isEmpty()) continue;
+                var cu = parseResult.getResult().get();
+
+                for (var cid : cu.findAll(com.github.javaparser.ast.body.ClassOrInterfaceDeclaration.class)) {
+                    if (!cid.getNameAsString().equals(className)) continue;
+
+                    List<String> imports = cu.getImports().stream()
+                            .map(imp -> imp.getNameAsString())
+                            .toList();
+
+                    List<FieldDep> fieldDeps = cid.getFields().stream()
+                            .flatMap(f -> f.getVariables().stream()
+                                    .map(v -> new FieldDep(f.getCommonType().asString(), v.getNameAsString())))
+                            .toList();
+
+                    List<FieldDep> ctorDeps = cid.getConstructors().stream()
+                            .flatMap(c -> c.getParameters().stream()
+                                    .map(p -> new FieldDep(p.getTypeAsString(), p.getNameAsString())))
+                            .toList();
+
+                    String qualifiedName = cu.getPackageDeclaration()
+                            .map(pd -> pd.getNameAsString() + "." + className)
+                            .orElse(className);
+
+                    formatter.printDependencies(new DependencyResult(qualifiedName, imports, fieldDeps, ctorDeps));
+                    return;
+                }
+            } catch (Exception e) {
+                // skip unparseable files
+            }
+        }
+        System.err.printf("Class '%s' not found.%n", className);
     }
 
     private static void runImplements(CodeParser parser, List<Path> javaFiles,

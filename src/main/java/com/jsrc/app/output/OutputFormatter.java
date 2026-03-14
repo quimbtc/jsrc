@@ -41,6 +41,13 @@ public interface OutputFormatter {
     void printClasses(List<ClassInfo> classes, Path sourceRoot);
 
     /**
+     * Prints class dependency results.
+     *
+     * @param result dependency data for the queried class
+     */
+    void printDependencies(DependencyResult result);
+
+    /**
      * Prints class hierarchy results.
      *
      * @param result hierarchy data for the queried class
