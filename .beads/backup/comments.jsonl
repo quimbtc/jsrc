@@ -1,0 +1,1 @@
+{"author":"kova","created_at":"2026-03-14T17:57:48Z","id":1,"issue_id":"jsrc-nyz","text":"Resumen: OutputFormatter interface con TextFormatter y JsonFormatter. JsonWriter minimal sin dependencias. App.java refactorizado para separar presentación de negocio. stderr para progreso, stdout para datos. 18 tests nuevos, 94 total."}
