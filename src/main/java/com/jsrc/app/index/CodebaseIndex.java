@@ -67,7 +67,7 @@ public class CodebaseIndex {
             String relativePath = sourceRoot.relativize(file).toString();
             try {
                 byte[] content = Files.readAllBytes(file);
-                String hash = sha256(content);
+                String hash = com.jsrc.app.util.Hashing.sha256(content);
                 long lastModified = Files.getLastModifiedTime(file).toMillis();
 
                 IndexEntry prev = existingByPath.get(relativePath);
@@ -280,17 +280,4 @@ public class CodebaseIndex {
         return map;
     }
 
-    private static String sha256(byte[] data) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(data);
-            StringBuilder sb = new StringBuilder();
-            for (byte b : hash) {
-                sb.append(String.format("%02x", b));
-            }
-            return sb.toString();
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("SHA-256 not available", e);
-        }
-    }
 }

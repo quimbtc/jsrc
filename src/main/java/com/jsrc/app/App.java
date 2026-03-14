@@ -191,7 +191,7 @@ public class App {
                 printUsage();
                 System.exit(ExitCode.BAD_USAGE);
             }
-            String methodName = argList.get(2);
+            String methodName = validateMethodRef(argList.get(2), "Method name");
             resultCount[0] = runCallers(javaFiles, methodName, config, formatter);
         } else if ("--callees".equals(command)) {
             if (argList.size() < 3) {
@@ -199,7 +199,7 @@ public class App {
                 printUsage();
                 System.exit(ExitCode.BAD_USAGE);
             }
-            String methodName = argList.get(2);
+            String methodName = validateMethodRef(argList.get(2), "Method name");
             resultCount[0] = runCallees(javaFiles, methodName, formatter);
         } else if ("--read".equals(command)) {
             if (argList.size() < 3) {
@@ -207,7 +207,7 @@ public class App {
                 printUsage();
                 System.exit(ExitCode.BAD_USAGE);
             }
-            String target = argList.get(2);
+            String target = validateMethodRef(argList.get(2), "Target");
             CodeParser parser = new HybridJavaParser();
             resultCount[0] = runRead(parser, javaFiles, target, formatter);
         } else if ("--index".equals(command)) {
@@ -266,7 +266,7 @@ public class App {
                 printUsage();
                 System.exit(ExitCode.BAD_USAGE);
             }
-            String methodName = argList.get(2);
+            String methodName = validateMethodRef(argList.get(2), "Method name");
             String outputDir = argList.size() >= 4 ? argList.get(3) : "./call-chains";
             resultCount[0] = runCallChainAnalysis(javaFiles, rootPath, methodName, outputDir, formatter);
         } else {
@@ -355,7 +355,7 @@ public class App {
                     long currentModified = java.nio.file.Files.getLastModifiedTime(file).toMillis();
                     if (currentModified > prev.lastModified()) {
                         byte[] content = java.nio.file.Files.readAllBytes(file);
-                        String hash = sha256(content);
+                        String hash = com.jsrc.app.util.Hashing.sha256(content);
                         if (!hash.equals(prev.contentHash())) {
                             modified.add(relativePath);
                         }
@@ -561,7 +561,7 @@ public class App {
                     if (currentModified > prev.lastModified()) {
                         // Timestamp changed — verify with content hash to avoid false positives from touch
                         byte[] content = java.nio.file.Files.readAllBytes(file);
-                        String hash = sha256(content);
+                        String hash = com.jsrc.app.util.Hashing.sha256(content);
                         if (!hash.equals(prev.contentHash())) {
                             modified.add(relativePath);
                         }
@@ -760,16 +760,14 @@ public class App {
         };
     }
 
-    private static String sha256(byte[] data) {
-        try {
-            var digest = java.security.MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(data);
-            StringBuilder sb = new StringBuilder();
-            for (byte b : hash) sb.append(String.format("%02x", b));
-            return sb.toString();
-        } catch (java.security.NoSuchAlgorithmException e) {
-            throw new RuntimeException("SHA-256 not available", e);
+
+    private static String validateMethodRef(String value, String label) {
+        String error = com.jsrc.app.util.InputValidator.validateMethodRef(value, label);
+        if (error != null) {
+            System.err.println("Error: " + error);
+            System.exit(ExitCode.BAD_USAGE);
         }
+        return value;
     }
 
     private static String validateArg(String value, String label) {

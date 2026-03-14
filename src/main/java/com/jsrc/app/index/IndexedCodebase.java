@@ -86,7 +86,7 @@ public class IndexedCodebase {
             staleCount++;
             try {
                 byte[] content = Files.readAllBytes(file);
-                String hash = sha256(content);
+                String hash = com.jsrc.app.util.Hashing.sha256(content);
                 long lastModified = Files.getLastModifiedTime(file).toMillis();
                 List<ClassInfo> classes = parser.parseClasses(file);
                 List<IndexedClass> indexed = classes.stream()
@@ -258,17 +258,4 @@ public class IndexedCodebase {
                 ci.interfaces(), methods, annotations, List.of());
     }
 
-    private static String sha256(byte[] data) {
-        try {
-            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(data);
-            StringBuilder sb = new StringBuilder();
-            for (byte b : hash) {
-                sb.append(String.format("%02x", b));
-            }
-            return sb.toString();
-        } catch (java.security.NoSuchAlgorithmException e) {
-            throw new RuntimeException("SHA-256 not available", e);
-        }
-    }
 }

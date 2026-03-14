@@ -79,6 +79,30 @@ public final class InputValidator {
         return validateIdentifier(methodPart, "Method name");
     }
 
+    /**
+     * Validates a method reference (may contain parens and dots).
+     * E.g. "process", "process(int)", "Service.process(int,String)"
+     *
+     * @return error message, or null if valid
+     */
+    public static String validateMethodRef(String value, String label) {
+        if (value == null || value.isBlank()) {
+            return label + " must not be empty";
+        }
+        if (hasControlChars(value)) {
+            return label + " contains control characters";
+        }
+        // Extract just the identifier parts for validation
+        String clean = value.replaceAll("\\(.*\\)", ""); // remove params
+        String[] parts = clean.split("\\.");
+        for (String part : parts) {
+            if (!part.isEmpty() && !JAVA_IDENTIFIER.matcher(part).matches()) {
+                return label + " contains invalid identifier: " + part;
+            }
+        }
+        return null;
+    }
+
     private static boolean hasControlChars(String value) {
         return CONTROL_CHARS.matcher(value).find();
     }
