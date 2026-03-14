@@ -21,5 +21,6 @@ jobs:
           java-version: '22'
           cache: 'maven'
       - name: Build with Maven
-        run: mvn package --enable-native-access=ALL-UNNAMED -Djava.library.path=/usr/local/lib
-        shell: bash
+        run: mvn package -Djava.library.path=/usr/local/lib
+        env:
+          MAVEN_OPTS: "--enable-native-access=ALL-UNNAMED"
