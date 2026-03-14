@@ -70,6 +70,17 @@ public interface OutputFormatter {
      * @return formatter instance
      */
     static OutputFormatter create(boolean json) {
-        return json ? new JsonFormatter() : new TextFormatter();
+        return create(json, false);
+    }
+
+    /**
+     * Factory method with signature-only option.
+     *
+     * @param json          true for JSON output, false for human-readable text
+     * @param signatureOnly true to emit only method signatures (no bodies, annotations, etc.)
+     * @return formatter instance
+     */
+    static OutputFormatter create(boolean json, boolean signatureOnly) {
+        return json ? new JsonFormatter(signatureOnly) : new TextFormatter(signatureOnly);
     }
 }

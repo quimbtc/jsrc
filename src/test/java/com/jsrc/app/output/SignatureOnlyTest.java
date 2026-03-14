@@ -20,8 +20,7 @@ class SignatureOnlyTest {
     @DisplayName("JsonFormatter with signatureOnly should emit only signature fields")
     void jsonSignatureOnly() {
         String out = captureOutput(() -> {
-            JsonFormatter fmt = new JsonFormatter();
-            fmt.setSignatureOnly(true);
+            JsonFormatter fmt = new JsonFormatter(true);
             MethodInfo method = new MethodInfo("process", "Service", 10, 50,
                     "String", List.of("public"),
                     List.of(new ParameterInfo("int", "id")),
@@ -58,8 +57,7 @@ class SignatureOnlyTest {
     @DisplayName("TextFormatter with signatureOnly should print only signatures")
     void textSignatureOnly() {
         String out = captureOutput(() -> {
-            TextFormatter fmt = new TextFormatter();
-            fmt.setSignatureOnly(true);
+            TextFormatter fmt = new TextFormatter(true);
             MethodInfo method = new MethodInfo("process", "Service", 10, 50,
                     "String", List.of("public"),
                     List.of(new ParameterInfo("int", "id")),

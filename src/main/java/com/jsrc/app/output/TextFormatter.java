@@ -15,12 +15,13 @@ import com.jsrc.app.parser.model.MethodInfo;
  */
 public class TextFormatter implements OutputFormatter {
 
-    private boolean signatureOnly;
+    private final boolean signatureOnly;
 
-    /**
-     * When true, method output shows only the signature line.
-     */
-    public void setSignatureOnly(boolean signatureOnly) {
+    public TextFormatter() {
+        this(false);
+    }
+
+    public TextFormatter(boolean signatureOnly) {
         this.signatureOnly = signatureOnly;
     }
 

@@ -20,12 +20,13 @@ import com.jsrc.app.parser.model.MethodReference;
  */
 public class JsonFormatter implements OutputFormatter {
 
-    private boolean signatureOnly;
+    private final boolean signatureOnly;
 
-    /**
-     * When true, method output includes only signature, className, file, and line numbers.
-     */
-    public void setSignatureOnly(boolean signatureOnly) {
+    public JsonFormatter() {
+        this(false);
+    }
+
+    public JsonFormatter(boolean signatureOnly) {
         this.signatureOnly = signatureOnly;
     }
 
