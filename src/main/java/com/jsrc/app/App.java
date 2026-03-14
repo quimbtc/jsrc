@@ -392,7 +392,25 @@ public class App {
                 ref.put("className", call.caller().className());
                 ref.put("methodName", call.caller().methodName());
                 ref.put("line", call.line());
+                ref.put("type", "direct");
                 callers.add(ref);
+            }
+        }
+
+        // Add reflective callers from invoker config
+        var config = com.jsrc.app.config.ProjectConfig.load(java.nio.file.Path.of("."));
+        if (config != null && !config.architecture().invokers().isEmpty()) {
+            var resolver = new com.jsrc.app.architecture.InvokerResolver(config.architecture().invokers());
+            for (var rc : resolver.resolve(javaFiles)) {
+                if (rc.targetMethod().equals(methodName)) {
+                    Map<String, Object> ref = new java.util.LinkedHashMap<>();
+                    ref.put("className", rc.callerClass());
+                    ref.put("methodName", rc.callerMethod());
+                    ref.put("line", rc.line());
+                    ref.put("type", "reflective");
+                    ref.put("targetClass", rc.targetClass());
+                    callers.add(ref);
+                }
             }
         }
 
@@ -413,6 +431,7 @@ public class App {
                 ref.put("className", call.callee().className());
                 ref.put("methodName", call.callee().methodName());
                 ref.put("line", call.line());
+                ref.put("type", "direct");
                 callees.add(ref);
             }
         }
