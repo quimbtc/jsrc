@@ -136,7 +136,15 @@ public class App {
         // Try loading index for full-parse commands (auto-refreshes stale entries)
         var indexedCodebase = com.jsrc.app.index.IndexedCodebase.tryLoad(Paths.get(rootPath), javaFiles);
 
-        if ("--callers".equals(command)) {
+        if ("--layer".equals(command)) {
+            if (argList.size() < 3) {
+                System.err.println("Error: --layer requires a layer name");
+                printUsage();
+                System.exit(ExitCode.BAD_USAGE);
+            }
+            String layerName = argList.get(2);
+            resultCount[0] = runLayer(indexedCodebase, javaFiles, rootPath, layerName, config, formatter);
+        } else if ("--callers".equals(command)) {
             if (argList.size() < 3) {
                 System.err.println("Error: --callers requires a method name");
                 printUsage();
@@ -241,6 +249,31 @@ public class App {
         if (resultCount[0] == 0 && !"--index".equals(command)) {
             System.exit(ExitCode.NOT_FOUND);
         }
+    }
+
+    private static int runLayer(com.jsrc.app.index.IndexedCodebase indexed,
+                                     List<Path> javaFiles, String rootPath,
+                                     String layerName,
+                                     com.jsrc.app.config.ProjectConfig config,
+                                     OutputFormatter formatter) {
+        if (config == null || config.architecture().layers().isEmpty()) {
+            System.err.println("Error: No architecture layers defined in .jsrc.yaml");
+            System.exit(ExitCode.BAD_USAGE);
+        }
+
+        List<ClassInfo> allClasses;
+        if (indexed != null) {
+            allClasses = indexed.getAllClasses();
+        } else {
+            CodeParser parser = new HybridJavaParser();
+            allClasses = new ArrayList<>();
+            for (Path file : javaFiles) allClasses.addAll(parser.parseClasses(file));
+        }
+
+        var resolver = new com.jsrc.app.architecture.LayerResolver(config.architecture().layers());
+        List<ClassInfo> layerClasses = resolver.filterByLayer(allClasses, layerName);
+        formatter.printClasses(layerClasses, Path.of(rootPath));
+        return layerClasses.size();
     }
 
     private static int runDiff(List<Path> javaFiles, String rootPath,
