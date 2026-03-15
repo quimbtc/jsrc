@@ -63,42 +63,16 @@ public class SearchCommand implements Command {
 
                 for (int i = 0; i < lines.size(); i++) {
                     String line = lines.get(i);
-                    String trimmed = line.trim();
-
-                    // Track block comment state
-                    if (inBlockComment) {
-                        if (trimmed.contains("*/")) {
-                            int endIdx = trimmed.indexOf("*/");
-                            // Check if pattern is before the closing */
-                            boolean matchBeforeClose = line.contains(pattern)
-                                    && line.indexOf(pattern) <= line.indexOf("*/");
-                            inBlockComment = false;
-                            if (line.contains(pattern)) {
-                                addMatch(results, file, i + 1, line, classes, matchBeforeClose);
-                            }
-                        } else if (line.contains(pattern)) {
-                            addMatch(results, file, i + 1, line, classes, true);
-                        }
-                    } else {
-                        // Check if a block comment starts on this line
-                        if (trimmed.startsWith("/*") || trimmed.startsWith("/**")) {
-                            if (trimmed.contains("*/")) {
-                                // Single-line block comment: /* ... */
-                                if (line.contains(pattern)) {
-                                    boolean patternInComment = isPatternInSingleLineBlockComment(line, pattern);
-                                    addMatch(results, file, i + 1, line, classes, patternInComment);
-                                }
-                            } else {
-                                inBlockComment = true;
-                                if (line.contains(pattern)) {
-                                    addMatch(results, file, i + 1, line, classes, true);
-                                }
-                            }
-                        } else if (line.contains(pattern)) {
-                            boolean isComment = isInLineComment(line, pattern);
-                            addMatch(results, file, i + 1, line, classes, isComment);
-                        }
+                    int patternIdx = line.indexOf(pattern);
+                    if (patternIdx < 0) {
+                        // No match — just update block comment state
+                        inBlockComment = updateBlockCommentState(line, inBlockComment);
+                        continue;
                     }
+
+                    boolean patternInComment = isPositionInComment(line, patternIdx, inBlockComment);
+                    inBlockComment = updateBlockCommentState(line, inBlockComment);
+                    addMatch(results, file, i + 1, line, classes, patternInComment);
                 }
             } catch (IOException e) {
                 // skip unreadable files
@@ -138,39 +112,83 @@ public class SearchCommand implements Command {
     }
 
     /**
-     * Checks if the pattern appears after a // comment marker on the same line.
+     * Determines if a given position in a line is inside a comment,
+     * considering the block comment state from previous lines.
+     * Handles //, /* *​/, and transitions on the same line.
      */
-    private static boolean isInLineComment(String line, String pattern) {
-        int commentIdx = line.indexOf("//");
-        if (commentIdx < 0) return false;
-        int patternIdx = line.indexOf(pattern);
-        // Pattern is in comment if // appears before the pattern
-        // and the // is not inside a string literal
-        return patternIdx > commentIdx && !isInsideStringLiteral(line, commentIdx);
-    }
+    private static boolean isPositionInComment(String line, int position, boolean inBlock) {
+        boolean inString = false;
+        boolean currentlyInBlock = inBlock;
 
-    /**
-     * Checks if the pattern is inside a single-line block comment like /* ... *​/
-     */
-    private static boolean isPatternInSingleLineBlockComment(String line, String pattern) {
-        int openIdx = line.indexOf("/*");
-        int closeIdx = line.indexOf("*/");
-        int patternIdx = line.indexOf(pattern);
-        return openIdx >= 0 && closeIdx > openIdx && patternIdx > openIdx && patternIdx < closeIdx;
-    }
+        for (int i = 0; i < line.length() && i < position; i++) {
+            char c = line.charAt(i);
 
-    /**
-     * Basic check: is the given index inside a string literal?
-     * Counts unescaped quotes before the index.
-     */
-    private static boolean isInsideStringLiteral(String line, int index) {
-        int quoteCount = 0;
-        for (int i = 0; i < index; i++) {
-            if (line.charAt(i) == '"' && (i == 0 || line.charAt(i - 1) != '\\')) {
-                quoteCount++;
+            if (currentlyInBlock) {
+                if (c == '*' && i + 1 < line.length() && line.charAt(i + 1) == '/') {
+                    currentlyInBlock = false;
+                    i++; // skip '/'
+                }
+                continue;
+            }
+
+            // Track string literals
+            if (c == '"' && (i == 0 || line.charAt(i - 1) != '\\')) {
+                inString = !inString;
+                continue;
+            }
+            if (inString) continue;
+
+            // Line comment — everything after is comment
+            if (c == '/' && i + 1 < line.length() && line.charAt(i + 1) == '/') {
+                return true;
+            }
+
+            // Block comment start
+            if (c == '/' && i + 1 < line.length() && line.charAt(i + 1) == '*') {
+                currentlyInBlock = true;
+                i++; // skip '*'
             }
         }
-        return quoteCount % 2 != 0;
+
+        return currentlyInBlock;
+    }
+
+    /**
+     * Updates the block comment state after processing a full line.
+     * Returns the inBlockComment state for the next line.
+     */
+    private static boolean updateBlockCommentState(String line, boolean inBlock) {
+        boolean inString = false;
+        boolean currentlyInBlock = inBlock;
+
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+
+            if (currentlyInBlock) {
+                if (c == '*' && i + 1 < line.length() && line.charAt(i + 1) == '/') {
+                    currentlyInBlock = false;
+                    i++;
+                }
+                continue;
+            }
+
+            if (c == '"' && (i == 0 || line.charAt(i - 1) != '\\')) {
+                inString = !inString;
+                continue;
+            }
+            if (inString) continue;
+
+            if (c == '/' && i + 1 < line.length() && line.charAt(i + 1) == '/') {
+                break; // rest of line is comment, but doesn't affect next line
+            }
+
+            if (c == '/' && i + 1 < line.length() && line.charAt(i + 1) == '*') {
+                currentlyInBlock = true;
+                i++;
+            }
+        }
+
+        return currentlyInBlock;
     }
 
     /**

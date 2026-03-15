@@ -145,6 +145,40 @@ class SearchCommandTest {
     }
 
     @Test
+    @DisplayName("Match between */ and /* on same line is not comment")
+    void matchBetweenBlockComments() throws Exception {
+        String source = """
+                package com.test;
+                public class Test {
+                    /* first */ void doWork() {} /* second
+                     */
+                }
+                """;
+        var results = executeSearch("doWork", source);
+        assertEquals(1, results.size());
+        @SuppressWarnings("unchecked")
+        var match = (java.util.Map<String, Object>) results.get(0);
+        assertEquals(false, match.get("inComment"));
+    }
+
+    @Test
+    @DisplayName("Match after */ followed by /* on same line is in comment")
+    void matchInSecondBlockComment() throws Exception {
+        String source = """
+                package com.test;
+                public class Test {
+                    /* first */ int x; /* doWork
+                     */
+                }
+                """;
+        var results = executeSearch("doWork", source);
+        assertEquals(1, results.size());
+        @SuppressWarnings("unchecked")
+        var match = (java.util.Map<String, Object>) results.get(0);
+        assertEquals(true, match.get("inComment"));
+    }
+
+    @Test
     @DisplayName("Match after block comment ends is not marked as comment")
     void matchAfterBlockComment() throws Exception {
         String source = """
