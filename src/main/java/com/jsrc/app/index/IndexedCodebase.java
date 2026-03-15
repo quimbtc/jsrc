@@ -231,38 +231,38 @@ public class IndexedCodebase {
         String lower = pattern.toLowerCase();
         List<IndexEntry> matching = new ArrayList<>();
         for (IndexEntry entry : entries) {
-            boolean found = false;
-            for (IndexedClass ic : entry.classes()) {
-                if (ic.name().toLowerCase().contains(lower)
-                        || ic.qualifiedName().toLowerCase().contains(lower)) {
-                    found = true;
-                    break;
-                }
-                for (String ann : ic.annotations()) {
-                    if (ann.toLowerCase().contains(lower)) {
-                        found = true;
-                        break;
-                    }
-                }
-                if (found) break;
-                for (IndexedMethod im : ic.methods()) {
-                    if (im.name().toLowerCase().contains(lower)) {
-                        found = true;
-                        break;
-                    }
-                    for (String ann : im.annotations()) {
-                        if (ann.toLowerCase().contains(lower)) {
-                            found = true;
-                            break;
-                        }
-                    }
-                    if (found) break;
-                }
-                if (found) break;
+            if (entryContains(entry, lower)) {
+                matching.add(entry);
             }
-            if (found) matching.add(entry);
         }
         return matching;
+    }
+
+    private static boolean entryContains(IndexEntry entry, String lower) {
+        for (IndexedClass ic : entry.classes()) {
+            // Class/interface names
+            if (ic.name().toLowerCase().contains(lower)
+                    || ic.qualifiedName().toLowerCase().contains(lower)) {
+                return true;
+            }
+            // Class annotations
+            for (String ann : ic.annotations()) {
+                if (ann.toLowerCase().contains(lower)) return true;
+            }
+            // Imports (e.g. searching for a type used as parameter)
+            for (String imp : ic.imports()) {
+                if (imp.toLowerCase().contains(lower)) return true;
+            }
+            // Methods: name, signature, annotations
+            for (IndexedMethod im : ic.methods()) {
+                if (im.name().toLowerCase().contains(lower)) return true;
+                if (im.signature() != null && im.signature().toLowerCase().contains(lower)) return true;
+                for (String ann : im.annotations()) {
+                    if (ann.toLowerCase().contains(lower)) return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**
