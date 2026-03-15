@@ -115,16 +115,25 @@ public class CallChainCommand implements Command {
         for (IndexEntry entry : ctx.indexed().getEntries()) {
             for (IndexedClass ic : entry.classes()) {
                 for (IndexedMethod im : ic.methods()) {
-                    String key = ic.name() + "." + im.name();
-                    if (im.signature() != null && !im.signature().isEmpty()) {
-                        // Extract params from signature: "public void foo(String bar, int x)" → "(String, int)"
-                        String params = extractParams(im.signature());
-                        map.putIfAbsent(key, params);
-                    }
+                    // Include param count in key to distinguish overloads
+                    String params = (im.signature() != null && !im.signature().isEmpty())
+                            ? extractParams(im.signature()) : "()";
+                    int paramCount = countParams(params);
+                    String key = ic.name() + "." + im.name() + "/" + paramCount;
+                    map.putIfAbsent(key, params);
+                    // Also store without param count as fallback
+                    map.putIfAbsent(ic.name() + "." + im.name(), params);
                 }
             }
         }
         return map;
+    }
+
+    private static int countParams(String params) {
+        if (params == null || params.equals("()")) return 0;
+        String inner = params.substring(1, params.length() - 1).trim();
+        if (inner.isEmpty()) return 0;
+        return inner.split(",").length;
     }
 
     private static String extractParams(String signature) {

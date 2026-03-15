@@ -181,8 +181,14 @@ public class CallChainTracer {
 
     private static boolean globMatch(String pattern, String text) {
         if (!pattern.contains("*")) return pattern.equals(text);
-        String regex = pattern.replace("*", ".*");
-        return text.matches(regex);
+        // Quote non-wildcard parts to handle regex specials (e.g. $)
+        String[] parts = pattern.split("\\*", -1);
+        StringBuilder regex = new StringBuilder();
+        for (int i = 0; i < parts.length; i++) {
+            regex.append(java.util.regex.Pattern.quote(parts[i]));
+            if (i < parts.length - 1) regex.append(".*");
+        }
+        return text.matches(regex.toString());
     }
 
     private boolean matchesParameterCount(MethodReference a, MethodReference b) {

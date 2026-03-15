@@ -116,8 +116,8 @@ public class MermaidDiagramGenerator {
      * Returns "()" if no signature found.
      */
     private String resolveParams(String className, String methodName) {
-        String key = className + "." + methodName;
-        return signatures.getOrDefault(key, "()");
+        // Fallback key without param count
+        return signatures.getOrDefault(className + "." + methodName, "()");
     }
 
     private Set<String> collectParticipants(CallChain chain) {
