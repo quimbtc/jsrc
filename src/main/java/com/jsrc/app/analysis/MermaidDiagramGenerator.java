@@ -31,17 +31,21 @@ public class MermaidDiagramGenerator {
         sb.append("%% ").append(chain.summary()).append("\n");
         sb.append("sequenceDiagram\n");
 
+        // Entry point actor first (leftmost position in diagram)
+        MethodCall firstStep = chain.steps().getFirst();
+        String rootClass = firstStep.caller().className();
+        String rootMethod = firstStep.caller().methodName();
+        boolean hasEntry = !"?".equals(rootClass);
+        if (hasEntry) {
+            sb.append("    actor Entry\n");
+        }
+
         Set<String> participants = collectParticipants(chain);
         for (String participant : participants) {
             sb.append("    participant ").append(participant).append("\n");
         }
 
-        // Show entry point as a call from an anonymous actor
-        MethodCall firstStep = chain.steps().getFirst();
-        String rootClass = firstStep.caller().className();
-        String rootMethod = firstStep.caller().methodName();
-        if (!"?".equals(rootClass)) {
-            sb.append("    actor Entry\n");
+        if (hasEntry) {
             sb.append("    Entry->>").append(rootClass).append(": ").append(rootMethod).append("()\n");
         }
 
