@@ -99,7 +99,7 @@ public class InvokerResolver {
                     }
                 }
             } catch (IOException e) {
-                logger.error("Error reading {}: {}", file, e.getMessage());
+                logger.debug("Error reading {}: {}", file, e.getMessage());
             }
         }
 
