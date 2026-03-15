@@ -147,53 +147,57 @@ public class App {
     }
 
     private static Command resolveCommand(String command, List<String> argList, boolean mdOutput) {
-        return switch (command) {
-            case "--index" -> new IndexCommand();
-            case "--overview" -> new OverviewCommand();
-            case "--classes" -> new ClassesCommand();
-            case "--smells" -> new SmellsCommand();
-            case "--summary" -> new SummaryCommand(requireArg(argList, "--summary", "class name"));
-            case "--hierarchy" -> new HierarchyCommand(requireArg(argList, "--hierarchy", "class name"));
-            case "--implements" -> new ImplementsCommand(requireArg(argList, "--implements", "interface name"));
-            case "--deps" -> new DepsCommand(requireArg(argList, "--deps", "class name"));
-            case "--annotations" -> new AnnotationsCommand(requireArg(argList, "--annotations", "annotation name"));
-            case "--callers" -> new CallersCommand(requireMethodArg(argList, "--callers"));
-            case "--callees" -> new CalleesCommand(requireMethodArg(argList, "--callees"));
-            case "--read" -> new ReadCommand(requireMethodArg(argList, "--read"));
-            case "--call-chain" -> {
-                String method = requireMethodArg(argList, "--call-chain");
-                String outDir = argList.size() >= 4 ? argList.get(3) : "./call-chains";
-                yield new CallChainCommand(method, outDir);
+        // Special case: --verify needs --spec
+        if ("--verify".equals(command)) {
+            String cls = requireArg(argList, "--verify", "class name");
+            int specIdx = argList.indexOf("--spec");
+            if (specIdx < 0 || specIdx + 1 >= argList.size()) {
+                System.err.println("Error: --verify requires --spec <path.md>");
+                System.exit(ExitCode.BAD_USAGE);
             }
-            case "--context" -> new ContextCommand(requireArg(argList, "--context", "class name"), mdOutput);
-            case "--contract" -> new ContractCommand(requireArg(argList, "--contract", "class name"));
-            case "--verify" -> {
-                String cls = requireArg(argList, "--verify", "class name");
-                int specIdx = argList.indexOf("--spec");
-                if (specIdx < 0 || specIdx + 1 >= argList.size()) {
-                    System.err.println("Error: --verify requires --spec <path.md>");
-                    System.exit(ExitCode.BAD_USAGE);
-                }
-                yield new VerifyCommand(cls, argList.get(specIdx + 1));
+            return new VerifyCommand(cls, argList.get(specIdx + 1));
+        }
+
+        // Special case: --call-chain may have output dir
+        if ("--call-chain".equals(command)) {
+            String method = requireMethodArg(argList, "--call-chain");
+            String outDir = argList.size() >= 4 ? argList.get(3) : "./call-chains";
+            return new CallChainCommand(method, outDir);
+        }
+
+        // Extract arg (next token after command)
+        String arg = extractArg(argList, command);
+
+        // Validate arg for commands that need identifiers
+        if (arg != null && command.startsWith("--")) {
+            if (List.of("--callers", "--callees", "--read", "--search", "--call-chain").contains(command)) {
+                String err = InputValidator.validateMethodRef(arg, "argument");
+                if (err != null) { System.err.println("Error: " + err); System.exit(ExitCode.BAD_USAGE); }
+            } else {
+                String err = InputValidator.validateIdentifier(arg, "argument");
+                if (err != null) { System.err.println("Error: " + err); System.exit(ExitCode.BAD_USAGE); }
             }
-            case "--layer" -> new LayerCommand(requireArg(argList, "--layer", "layer name"));
-            case "--check" -> new CheckCommand(argList.size() >= 3 ? argList.get(2) : null);
-            case "--endpoints" -> new EndpointsCommand();
-            case "--diff" -> new DiffCommand();
-            case "--changed" -> new ChangedCommand();
-            case "--drift" -> new DriftCommand();
-            case "--search" -> new SearchCommand(requireMethodArg(argList, "--search"));
-            case "--imports" -> new ImportsCommand(requireArg(argList, "--imports", "class name"));
-            case "--packages" -> new PackagesCommand();
-            case "--explain" -> new ExplainCommand(requireArg(argList, "--explain", "class name"));
-            case "--batch" -> new BatchCommand();
-            case "--unused" -> new UnusedCommand();
-            case "--similar" -> new SimilarCommand(requireArg(argList, "--similar", "class name"));
-            case "--watch" -> new WatchCommand();
-            case "--stats" -> new MetricsCommand(requireArg(argList, "--stats", "class name"));
-            case "--history" -> new HistoryCommand(requireArg(argList, "--history", "class name"));
-            default -> new MethodSearchCommand(command); // method name search
-        };
+        }
+
+        // Use factory
+        Command cmd = CommandFactory.create(command, arg, mdOutput);
+        if (cmd != null) return cmd;
+
+        // Non-flag = method search
+        if (!command.startsWith("--")) return CommandFactory.createMethodSearch(command);
+
+        System.err.println("Unknown command: " + command);
+        System.exit(ExitCode.BAD_USAGE);
+        return null;
+    }
+
+    private static String extractArg(List<String> argList, String command) {
+        int cmdIdx = argList.indexOf(command);
+        if (cmdIdx >= 0 && cmdIdx + 1 < argList.size()) {
+            String next = argList.get(cmdIdx + 1);
+            if (!next.startsWith("--")) return next;
+        }
+        return null;
     }
 
     private static String requireArg(List<String> argList, String command, String label) {

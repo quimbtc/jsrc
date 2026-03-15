@@ -50,7 +50,10 @@ public class WatchCommand implements Command {
                             ctx.formatter(), freshIndexed, ctx.parser());
 
                     // Execute command
-                    Command cmd = resolveWatchCommand(command, arg);
+                    Command cmd = CommandFactory.create("--" + command, arg, false);
+                    if (cmd == null && !command.startsWith("--")) {
+                        cmd = CommandFactory.createMethodSearch(command);
+                    }
                     if (cmd == null) {
                         Map<String, Object> error = new LinkedHashMap<>();
                         error.put("error", "Unknown command: " + command);
@@ -59,16 +62,16 @@ public class WatchCommand implements Command {
                         continue;
                     }
 
-                    // Capture output
-                    var baos = new java.io.ByteArrayOutputStream();
+                    // Capture output safely
                     var originalOut = System.out;
-                    System.setOut(new java.io.PrintStream(baos));
-                    int resultCount = cmd.execute(freshCtx);
-                    System.setOut(originalOut);
-
-                    String output = baos.toString().trim();
-                    // Forward output directly (already JSON)
-                    System.out.println(output);
+                    var baos = new java.io.ByteArrayOutputStream();
+                    try {
+                        System.setOut(new java.io.PrintStream(baos));
+                        cmd.execute(freshCtx);
+                    } finally {
+                        System.setOut(originalOut); // ALWAYS restore
+                    }
+                    System.out.println(baos.toString().trim());
                     System.out.flush();
 
                 } catch (Exception e) {
@@ -84,28 +87,5 @@ public class WatchCommand implements Command {
         return 0;
     }
 
-    private static Command resolveWatchCommand(String command, String arg) {
-        return switch (command) {
-            case "overview" -> new OverviewCommand();
-            case "classes" -> new ClassesCommand();
-            case "summary" -> arg.isEmpty() ? null : new SummaryCommand(arg);
-            case "hierarchy" -> arg.isEmpty() ? null : new HierarchyCommand(arg);
-            case "implements" -> arg.isEmpty() ? null : new ImplementsCommand(arg);
-            case "deps" -> arg.isEmpty() ? null : new DepsCommand(arg);
-            case "annotations" -> arg.isEmpty() ? null : new AnnotationsCommand(arg);
-            case "callers" -> arg.isEmpty() ? null : new CallersCommand(arg);
-            case "callees" -> arg.isEmpty() ? null : new CalleesCommand(arg);
-            case "read" -> arg.isEmpty() ? null : new ReadCommand(arg);
-            case "search" -> arg.isEmpty() ? null : new SearchCommand(arg);
-            case "imports" -> arg.isEmpty() ? null : new ImportsCommand(arg);
-            case "explain" -> arg.isEmpty() ? null : new ExplainCommand(arg);
-            case "packages" -> new PackagesCommand();
-            case "endpoints" -> new EndpointsCommand();
-            case "unused" -> new UnusedCommand();
-            case "stats" -> arg.isEmpty() ? null : new MetricsCommand(arg);
-            case "smells" -> new SmellsCommand();
-            case "similar" -> arg.isEmpty() ? null : new SimilarCommand(arg);
-            default -> null;
-        };
-    }
+
 }

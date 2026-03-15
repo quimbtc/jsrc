@@ -28,47 +28,36 @@ public class BatchCommand implements Command {
             }
 
             List<Map<String, Object>> results = new ArrayList<>();
-            var originalOut = System.out;
-            
             for (Object cmdObj : commands) {
                 String cmdStr = cmdObj.toString();
-                
-                // Capture stdout
-                var baos = new java.io.ByteArrayOutputStream();
-                System.setOut(new java.io.PrintStream(baos));
-                
-                try {
-                    // Parse the command string into args
+                Map<String, Object> entry = new LinkedHashMap<>();
+                entry.put("command", cmdStr);
+
+                CapturedOutput captured = captureOutput(() -> {
                     String[] parts = cmdStr.trim().split("\\s+");
                     String command = parts[0];
-                    List<String> argList = new ArrayList<>(List.of(parts));
-                    
-                    // Create and execute command
-                    Command cmd = resolveFromString(command, argList);
-                    int count = cmd.execute(ctx);
-                    
-                    String output = baos.toString().trim();
-                    Map<String, Object> entry = new LinkedHashMap<>();
-                    entry.put("command", cmdStr);
-                    entry.put("resultCount", count);
-                    
-                    // Try to parse output as JSON
-                    try {
-                        Object jsonOutput = JsonReader.parse(output);
-                        entry.put("result", jsonOutput);
-                    } catch (Exception e) {
-                        entry.put("result", output);
+                    String arg = parts.length > 1 ? parts[1] : null;
+                    Command cmd = CommandFactory.create(command, arg, false);
+                    if (cmd == null && !command.startsWith("--")) {
+                        cmd = CommandFactory.createMethodSearch(command);
                     }
-                    
-                    results.add(entry);
-                } catch (Exception e) {
-                    Map<String, Object> entry = new LinkedHashMap<>();
-                    entry.put("command", cmdStr);
-                    entry.put("error", e.getMessage());
-                    results.add(entry);
-                } finally {
-                    System.setOut(originalOut);
+                    if (cmd != null) {
+                        return cmd.execute(ctx);
+                    }
+                    return -1;
+                });
+
+                if (captured.returnValue >= 0) {
+                    entry.put("resultCount", captured.returnValue);
+                    try {
+                        entry.put("result", JsonReader.parse(captured.text));
+                    } catch (Exception e) {
+                        entry.put("result", captured.text);
+                    }
+                } else {
+                    entry.put("error", "Unknown command");
                 }
+                results.add(entry);
             }
 
             System.out.println(JsonWriter.toJson(results));
@@ -79,26 +68,19 @@ public class BatchCommand implements Command {
         }
     }
 
-    private static Command resolveFromString(String command, List<String> argList) {
-        String arg = argList.size() > 1 ? argList.get(1) : null;
-        return switch (command) {
-            case "--overview" -> new OverviewCommand();
-            case "--classes" -> new ClassesCommand();
-            case "--smells" -> new SmellsCommand();
-            case "--summary" -> new SummaryCommand(arg);
-            case "--hierarchy" -> new HierarchyCommand(arg);
-            case "--implements" -> new ImplementsCommand(arg);
-            case "--deps" -> new DepsCommand(arg);
-            case "--annotations" -> new AnnotationsCommand(arg);
-            case "--callers" -> new CallersCommand(arg);
-            case "--callees" -> new CalleesCommand(arg);
-            case "--read" -> new ReadCommand(arg);
-            case "--imports" -> new ImportsCommand(arg);
-            case "--explain" -> new ExplainCommand(arg);
-            case "--search" -> new SearchCommand(arg);
-            case "--packages" -> new PackagesCommand();
-            case "--endpoints" -> new EndpointsCommand();
-            default -> new MethodSearchCommand(command);
-        };
+    private record CapturedOutput(String text, int returnValue) {}
+
+    private static CapturedOutput captureOutput(java.util.function.IntSupplier action) {
+        var originalOut = System.out;
+        var baos = new java.io.ByteArrayOutputStream();
+        try {
+            System.setOut(new java.io.PrintStream(baos));
+            int result = action.getAsInt();
+            return new CapturedOutput(baos.toString().trim(), result);
+        } catch (Exception e) {
+            return new CapturedOutput(e.getMessage(), -1);
+        } finally {
+            System.setOut(originalOut); // ALWAYS restore
+        }
     }
 }
