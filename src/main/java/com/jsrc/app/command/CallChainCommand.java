@@ -28,9 +28,10 @@ public class CallChainCommand implements Command {
             graphBuilder.build(ctx.javaFiles());
         }
 
-        // Add reflective call edges — skip if index already has them
-        if (ctx.config() != null && !ctx.config().architecture().invokers().isEmpty()
-                && !(ctx.indexed() != null && ctx.indexed().hasCallEdges())) {
+        // Always add reflective call edges from invoker config.
+        // Even if index has edges, reflective ones may be missing
+        // (e.g. index built before yaml was configured correctly).
+        if (ctx.config() != null && !ctx.config().architecture().invokers().isEmpty()) {
             var resolver = new InvokerResolver(ctx.config().architecture().invokers());
             var reflective = resolver.resolve(ctx.javaFiles());
             for (MethodCall edge : resolver.toCallEdges(reflective)) {
