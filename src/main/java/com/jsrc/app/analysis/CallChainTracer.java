@@ -141,12 +141,17 @@ public class CallChainTracer {
             return Set.of();
         }
 
+        // Fuzzy match: same method name + compatible param count.
+        // Only match across classes if target class is unresolved ("?"),
+        // otherwise require same class name to avoid mixing callers
+        // from unrelated methods with the same name.
         Set<MethodCall> fuzzy = new HashSet<>();
+        boolean unresolvedTarget = "?".equals(target.className()) || target.className() == null;
         for (MethodReference registered : graph.getAllCallerIndexKeys()) {
-            if (registered.methodName().equals(target.methodName())
-                    && matchesParameterCount(registered, target)) {
-                fuzzy.addAll(graph.getCallersOf(registered));
-            }
+            if (!registered.methodName().equals(target.methodName())) continue;
+            if (!matchesParameterCount(registered, target)) continue;
+            if (!unresolvedTarget && !registered.className().equals(target.className())) continue;
+            fuzzy.addAll(graph.getCallersOf(registered));
         }
         return fuzzy;
     }
