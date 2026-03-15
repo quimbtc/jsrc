@@ -5,6 +5,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import com.jsrc.app.analysis.CallChainTracer;
@@ -14,7 +15,10 @@ import com.jsrc.app.architecture.InvokerResolver;
 import com.jsrc.app.index.IndexedClass;
 import com.jsrc.app.index.IndexedMethod;
 import com.jsrc.app.index.IndexEntry;
+import com.jsrc.app.parser.model.CallChain;
 import com.jsrc.app.parser.model.MethodCall;
+import com.jsrc.app.parser.model.MethodReference;
+import com.jsrc.app.util.MethodResolver;
 
 public class CallChainCommand implements Command {
     private final String methodName;
@@ -51,7 +55,36 @@ public class CallChainCommand implements Command {
                 ? new java.util.HashSet<>(ctx.config().architecture().chainStopMethods())
                 : java.util.Set.of();
         CallChainTracer tracer = new CallChainTracer(graphBuilder, 20, stopMethods);
-        var chains = tracer.traceToRoots(methodName);
+
+        // Parse input: supports methodName, Class.method, Class.method(Type1,Type2)
+        var ref = MethodResolver.parse(methodName);
+        List<CallChain> chains;
+
+        if (ref.hasClassName()) {
+            // Filter targets by class name
+            java.util.Set<MethodReference> targets = graphBuilder.findMethodsByName(ref.methodName());
+            java.util.Set<MethodReference> filtered = new java.util.HashSet<>();
+            for (MethodReference target : targets) {
+                if (target.className().equals(ref.className())) {
+                    if (ref.hasParamTypes()) {
+                        if (target.parameterCount() < 0 || target.parameterCount() == ref.paramTypes().size()) {
+                            filtered.add(target);
+                        }
+                    } else {
+                        filtered.add(target);
+                    }
+                }
+            }
+            chains = new java.util.ArrayList<>();
+            java.util.Set<String> seen = new java.util.HashSet<>();
+            for (MethodReference target : filtered) {
+                for (CallChain chain : tracer.traceToRoots(target)) {
+                    if (seen.add(chain.summary())) chains.add(chain);
+                }
+            }
+        } else {
+            chains = tracer.traceToRoots(ref.methodName());
+        }
 
         // Build signature map from index for enriched output
         Map<String, String> signatures = buildSignatureMap(ctx);
