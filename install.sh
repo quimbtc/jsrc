@@ -53,7 +53,7 @@ check_java() {
         export PATH="$HOME/.sdkman/candidates/java/current/Contents/Home/bin:$PATH"
     fi
     if [[ -n "$java_bin" ]]; then
-        JAVA_VER=$($java_bin -version 2>&1 | head -1 | sed 's/.*"\([0-9]*\).*/\1/')
+        JAVA_VER=$($java_bin -version 2>&1 | head -1 | awk -F'"' '{print $2}' | cut -d. -f1)
         if [[ "$JAVA_VER" -ge "$MIN_JAVA_VERSION" ]]; then
             echo "✓ Java $JAVA_VER found"
             return 0
