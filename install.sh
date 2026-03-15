@@ -75,8 +75,11 @@ if command -v mvn &>/dev/null; then
     echo "✓ Maven found: $(mvn --version 2>&1 | head -1)"
 else
     echo "Maven not found. Installing via SDKMAN..."
-    source "$HOME/.sdkman/bin/sdkman-init.sh" 2>/dev/null || true
+    if ! command -v sdk &>/dev/null; then
+        source "$HOME/.sdkman/bin/sdkman-init.sh" 2>/dev/null || true
+    fi
     sdk install maven -y
+    source "$HOME/.sdkman/bin/sdkman-init.sh" 2>/dev/null || true
     echo "✓ Maven installed"
 fi
 
@@ -154,7 +157,7 @@ else
     if [[ -d "$INSTALL_DIR" ]]; then
         echo "Directory exists, using as-is"
     else
-        git clone https://github.com/quimbtc/jsrc.git "$INSTALL_DIR" 2>/dev/null
+        git clone https://github.com/joadpe/jsrc.git "$INSTALL_DIR" 2>/dev/null
     fi
     cd "$INSTALL_DIR"
 fi
