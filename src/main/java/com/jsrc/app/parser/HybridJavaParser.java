@@ -51,6 +51,7 @@ public class HybridJavaParser implements CodeParser {
     private final TreeSitterParser treeSitter;
     private final JavaParser javaParser;
     private final CodeSmellDetector smellDetector;
+    private final java.util.Set<String> skippedFiles = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     public HybridJavaParser() {
         this.treeSitter = new TreeSitterParser("java");
@@ -61,6 +62,11 @@ public class HybridJavaParser implements CodeParser {
     @Override
     public String getLanguage() {
         return "java";
+    }
+
+    @Override
+    public java.util.Set<String> getSkippedFiles() {
+        return java.util.Collections.unmodifiableSet(skippedFiles);
     }
 
     // ---- targeted search: TreeSitter locates, JavaParser enriches ----
@@ -270,7 +276,8 @@ public class HybridJavaParser implements CodeParser {
             }
             logger.warn("JavaParser could not parse {}, falling back to TreeSitter", path.getFileName());
         } catch (IOException ex) {
-            logger.error("Error reading file {}: {}", path, ex.getMessage(), ex);
+            logger.debug("Error reading file {}: {}", path, ex.getMessage());
+            skippedFiles.add(path.toString());
         }
         return null;
     }

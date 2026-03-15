@@ -50,4 +50,11 @@ public interface CodeParser {
      * Returns the language this parser is configured for.
      */
     String getLanguage();
+
+    /**
+     * Returns files that were skipped due to encoding or I/O errors.
+     */
+    default java.util.Set<String> getSkippedFiles() {
+        return java.util.Set.of();
+    }
 }

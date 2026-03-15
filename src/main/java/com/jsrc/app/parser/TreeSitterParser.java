@@ -45,6 +45,7 @@ public class TreeSitterParser implements CodeParser {
 
     private final Parser parser;
     private final Language language;
+    private final java.util.Set<String> skippedFiles = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private final String languageKey;
 
     @SuppressWarnings("null")
@@ -126,9 +127,11 @@ public class TreeSitterParser implements CodeParser {
                 });
             }
         } catch (IOException ex) {
-            logger.error("Error reading file {}: {}", path, ex.getMessage(), ex);
+            logger.debug("Error reading file {}: {}", path, ex.getMessage());
+            skippedFiles.add(path.toString());
         } catch (Exception ex) {
-            logger.error("Unexpected error parsing file {}: {}", path, ex.getMessage(), ex);
+            logger.debug("Unexpected error parsing file {}: {}", path, ex.getMessage());
+            skippedFiles.add(path.toString());
         }
         return results;
     }
@@ -150,9 +153,11 @@ public class TreeSitterParser implements CodeParser {
                 });
             }
         } catch (IOException ex) {
-            logger.error("Error reading file {}: {}", path, ex.getMessage(), ex);
+            logger.debug("Error reading file {}: {}", path, ex.getMessage());
+            skippedFiles.add(path.toString());
         } catch (Exception ex) {
-            logger.error("Unexpected error parsing file {}: {}", path, ex.getMessage(), ex);
+            logger.debug("Unexpected error parsing file {}: {}", path, ex.getMessage());
+            skippedFiles.add(path.toString());
         }
         return results;
     }

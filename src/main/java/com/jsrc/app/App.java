@@ -76,6 +76,12 @@ public class App {
             }
         }
 
+        // Report skipped files summary
+        var skipped = parser.getSkippedFiles();
+        if (!skipped.isEmpty()) {
+            System.err.printf("Warning: skipped %d file(s) due to encoding errors%n", skipped.size());
+        }
+
         // Exit code
         if (resultCount == 0 && !"--index".equals(parsed.command())) {
             System.exit(ExitCode.NOT_FOUND);
