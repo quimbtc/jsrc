@@ -55,32 +55,38 @@ sdk_cmd() {
     # SDKMAN requires bash 4+ (uses ${var^^}). macOS ships bash 3.2.
     # Run sdk commands via zsh on macOS if bash is too old.
     if [[ "$OS" == "Darwin" && "${BASH_VERSINFO[0]}" -lt 4 ]]; then
-        zsh -c "source \"$HOME/.sdkman/bin/sdkman-init.sh\" && sdk $*"
+        zsh -c "source \"$HOME/.sdkman/bin/sdkman-init.sh\" && sdk $*" || true
     else
         source "$HOME/.sdkman/bin/sdkman-init.sh" 2>/dev/null || true
-        sdk "$@"
+        sdk "$@" || true
+    fi
+}
+
+ensure_sdkman() {
+    if [[ ! -f "$HOME/.sdkman/bin/sdkman-init.sh" ]]; then
+        echo "Installing SDKMAN..."
+        curl -s "https://get.sdkman.io" | bash
     fi
 }
 
 install_java() {
     echo "Java $MIN_JAVA_VERSION+ not found. Installing via SDKMAN..."
-    if ! command -v sdk &>/dev/null; then
-        if [[ -f "$HOME/.sdkman/bin/sdkman-init.sh" ]]; then
-            source "$HOME/.sdkman/bin/sdkman-init.sh" 2>/dev/null || true
-        else
-            echo "Installing SDKMAN..."
-            curl -s "https://get.sdkman.io" | bash
-            source "$HOME/.sdkman/bin/sdkman-init.sh" 2>/dev/null || true
-        fi
-    fi
-    # If sdk still fails (bash 3.2 on macOS), use zsh
-    if ! command -v sdk &>/dev/null && [[ "$OS" == "Darwin" ]]; then
-        echo "  (using zsh for SDKMAN compatibility)"
-    fi
-    sdk_cmd install java 22.0.2-tem -y || sdk_cmd install java 22.0.2-sem -y
+    ensure_sdkman
+    sdk_cmd install java 22.0.2-tem -y
     # Reload PATH to pick up new java
     export PATH="$HOME/.sdkman/candidates/java/current/bin:$PATH"
-    echo "✓ Java 22 installed"
+    # Verify
+    if check_java; then
+        return 0
+    fi
+    # Try alternative distribution
+    sdk_cmd install java 22.0.2-sem -y
+    export PATH="$HOME/.sdkman/candidates/java/current/bin:$PATH"
+    if check_java; then
+        return 0
+    fi
+    echo "Error: Failed to install Java $MIN_JAVA_VERSION"
+    exit 1
 }
 
 if ! check_java; then
@@ -92,8 +98,13 @@ if command -v mvn &>/dev/null; then
     echo "✓ Maven found: $(mvn --version 2>&1 | head -1)"
 else
     echo "Maven not found. Installing via SDKMAN..."
+    ensure_sdkman
     sdk_cmd install maven -y
     export PATH="$HOME/.sdkman/candidates/maven/current/bin:$PATH"
+    if ! command -v mvn &>/dev/null; then
+        echo "Error: Maven installation failed"
+        exit 1
+    fi
     echo "✓ Maven installed"
 fi
 
