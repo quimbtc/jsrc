@@ -124,6 +124,20 @@ public class CallGraphBuilder {
     }
 
     /**
+     * Adds a single call edge to the graph (e.g. reflective calls from InvokerResolver).
+     */
+    public void addEdge(MethodCall call) {
+        MethodReference caller = call.caller();
+        MethodReference callee = call.callee();
+        allMethods.add(caller);
+        allMethods.add(callee);
+        methodsByName.computeIfAbsent(caller.methodName(), k -> new HashSet<>()).add(caller);
+        methodsByName.computeIfAbsent(callee.methodName(), k -> new HashSet<>()).add(callee);
+        calleeIndex.computeIfAbsent(caller, k -> new HashSet<>()).add(call);
+        callerIndex.computeIfAbsent(callee, k -> new HashSet<>()).add(call);
+    }
+
+    /**
      * Returns all calls where {@code method} is the callee (who calls this method?).
      */
     public Set<MethodCall> getCallersOf(MethodReference method) {

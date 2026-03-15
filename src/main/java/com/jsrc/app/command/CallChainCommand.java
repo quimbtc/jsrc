@@ -7,6 +7,8 @@ import java.nio.file.Paths;
 import com.jsrc.app.analysis.CallChainTracer;
 import com.jsrc.app.analysis.CallGraphBuilder;
 import com.jsrc.app.analysis.MermaidDiagramGenerator;
+import com.jsrc.app.architecture.InvokerResolver;
+import com.jsrc.app.parser.model.MethodCall;
 
 public class CallChainCommand implements Command {
     private final String methodName;
@@ -24,6 +26,15 @@ public class CallChainCommand implements Command {
             graphBuilder.loadFromIndex(ctx.indexed().getEntries());
         } else {
             graphBuilder.build(ctx.javaFiles());
+        }
+
+        // Add reflective call edges from invoker config
+        if (ctx.config() != null && !ctx.config().architecture().invokers().isEmpty()) {
+            var resolver = new InvokerResolver(ctx.config().architecture().invokers());
+            var reflective = resolver.resolve(ctx.javaFiles());
+            for (MethodCall edge : resolver.toCallEdges(reflective)) {
+                graphBuilder.addEdge(edge);
+            }
         }
 
         CallChainTracer tracer = new CallChainTracer(graphBuilder);
