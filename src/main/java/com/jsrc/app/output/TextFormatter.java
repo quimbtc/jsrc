@@ -238,6 +238,12 @@ public class TextFormatter implements OutputFormatter {
 
     @Override
     public void printCallChains(List<CallChain> chains, String methodName) {
+        printCallChains(chains, methodName, java.util.Map.of());
+    }
+
+    @Override
+    public void printCallChains(List<CallChain> chains, String methodName,
+                                 java.util.Map<String, String> signatures) {
         if (chains.isEmpty()) {
             System.out.printf("No call chains found for method '%s'.%n", methodName);
             return;
@@ -247,14 +253,30 @@ public class TextFormatter implements OutputFormatter {
         for (int i = 0; i < chains.size(); i++) {
             CallChain chain = chains.get(i);
             System.out.printf("%n  Chain %d (depth %d):%n", i + 1, chain.depth());
-            System.out.printf("    %s%n", chain.summary());
+            System.out.printf("    %s%n", chainSummary(chain, signatures));
             for (MethodCall step : chain.steps()) {
                 System.out.printf("    %s -> %s [line %d]%n",
-                        step.caller().displayName(),
-                        step.callee().displayName(),
+                        displayWithParams(step.caller(), signatures),
+                        displayWithParams(step.callee(), signatures),
                         step.line());
             }
         }
+    }
+
+    private static String displayWithParams(com.jsrc.app.parser.model.MethodReference ref,
+                                             java.util.Map<String, String> signatures) {
+        String key = ref.className() + "." + ref.methodName();
+        String params = signatures.getOrDefault(key, "()");
+        return ref.className() + "." + ref.methodName() + params;
+    }
+
+    private static String chainSummary(CallChain chain, java.util.Map<String, String> signatures) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(displayWithParams(chain.root(), signatures));
+        for (MethodCall step : chain.steps()) {
+            sb.append(" -> ").append(displayWithParams(step.callee(), signatures));
+        }
+        return sb.toString();
     }
 
     @Override

@@ -26,6 +26,7 @@ public class JsonFormatter implements OutputFormatter {
 
     private final boolean signatureOnly;
     private final java.util.Set<String> fields;
+    private java.util.Map<String, String> currentSignatures = java.util.Map.of();
 
     public JsonFormatter() {
         this(false, null);
@@ -226,10 +227,18 @@ public class JsonFormatter implements OutputFormatter {
 
     @Override
     public void printCallChains(List<CallChain> chains, String methodName) {
+        printCallChains(chains, methodName, java.util.Map.of());
+    }
+
+    @Override
+    public void printCallChains(List<CallChain> chains, String methodName,
+                                 java.util.Map<String, String> signatures) {
+        this.currentSignatures = signatures;
         List<Map<String, Object>> items = chains.stream()
                 .map(this::chainToMap)
                 .toList();
         System.out.println(JsonWriter.toJson(items));
+        this.currentSignatures = java.util.Map.of();
     }
 
     // ---- serialization helpers ----
@@ -336,6 +345,11 @@ public class JsonFormatter implements OutputFormatter {
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("className", ref.className());
         map.put("methodName", ref.methodName());
+        String key = ref.className() + "." + ref.methodName();
+        String params = currentSignatures.getOrDefault(key, null);
+        if (params != null) {
+            map.put("params", params);
+        }
         return map;
     }
 

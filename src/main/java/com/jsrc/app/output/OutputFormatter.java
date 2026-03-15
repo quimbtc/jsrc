@@ -116,6 +116,14 @@ public interface OutputFormatter {
     void printCallChains(List<CallChain> chains, String methodName);
 
     /**
+     * Prints call chain results with method parameter signatures.
+     */
+    default void printCallChains(List<CallChain> chains, String methodName,
+                                  java.util.Map<String, String> signatures) {
+        printCallChains(chains, methodName);
+    }
+
+    /**
      * Prints a generic result (Map or List) with field filtering applied.
      * Use this for commands that build ad-hoc result structures.
      *

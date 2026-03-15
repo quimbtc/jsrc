@@ -55,7 +55,7 @@ public class CallChainCommand implements Command {
         // Build signature map from index for enriched output
         Map<String, String> signatures = buildSignatureMap(ctx);
 
-        ctx.formatter().printCallChains(chains, methodName);
+        ctx.formatter().printCallChains(chains, methodName, signatures);
 
         if (!chains.isEmpty()) {
             MermaidDiagramGenerator generator = new MermaidDiagramGenerator(signatures);
