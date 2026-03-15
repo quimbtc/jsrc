@@ -168,18 +168,21 @@ public class CallChainTracer {
 
     /**
      * Checks if the method matches a configured stop method pattern.
-     * Supports exact names (e.g. "actionPerformed") and prefix patterns (e.g. "get*").
+     * Supports: exact ("actionPerformed"), prefix ("getBtn*"), suffix ("*Btn"),
+     * and contains ("get*Btn*") patterns using simple glob matching.
      */
     private boolean isStopMethod(MethodReference method) {
         String name = method.methodName();
         for (String stop : stopMethods) {
-            if (stop.endsWith("*")) {
-                if (name.startsWith(stop.substring(0, stop.length() - 1))) return true;
-            } else {
-                if (name.equals(stop)) return true;
-            }
+            if (globMatch(stop, name)) return true;
         }
         return false;
+    }
+
+    private static boolean globMatch(String pattern, String text) {
+        if (!pattern.contains("*")) return pattern.equals(text);
+        String regex = pattern.replace("*", ".*");
+        return text.matches(regex);
     }
 
     private boolean matchesParameterCount(MethodReference a, MethodReference b) {
