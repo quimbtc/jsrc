@@ -4,16 +4,13 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.jsrc.app.index.IndexEntry;
 import com.jsrc.app.output.JsonWriter;
 import com.jsrc.app.parser.model.ClassInfo;
 import com.jsrc.app.parser.model.MethodInfo;
@@ -35,33 +32,10 @@ public class SearchCommand implements Command {
     public int execute(CommandContext ctx) {
         List<Map<String, Object>> results = new ArrayList<>();
 
-        // Use index to narrow search if available and pattern looks like an identifier
+        // Note: index is NOT used to filter files — it doesn't contain method bodies,
+        // so call sites would be missed. Index is only used below to avoid re-parsing
+        // ClassInfo when resolving enclosing class/method context.
         List<Path> filesToSearch = ctx.javaFiles();
-        if (ctx.indexed() != null && isJavaIdentifier(pattern)) {
-            List<IndexEntry> indexed = ctx.indexed().findEntriesContaining(pattern);
-            if (!indexed.isEmpty()) {
-                Set<String> indexedPaths = new HashSet<>();
-                for (IndexEntry entry : indexed) {
-                    indexedPaths.add(entry.path());
-                }
-                List<Path> filtered = ctx.javaFiles().stream()
-                        .filter(f -> {
-                            String fStr = f.toString();
-                            for (String ip : indexedPaths) {
-                                if (fStr.endsWith(ip) || ip.endsWith(fStr)) return true;
-                            }
-                            return false;
-                        })
-                        .toList();
-                if (!filtered.isEmpty()) {
-                    filesToSearch = filtered;
-                    logger.debug("Index narrowed search from {} to {} files for '{}'",
-                            ctx.javaFiles().size(), filesToSearch.size(), pattern);
-                } else {
-                    logger.debug("Index matched {} entries but no path overlap, falling back to full scan", indexed.size());
-                }
-            }
-        }
 
         for (Path file : filesToSearch) {
             try {
