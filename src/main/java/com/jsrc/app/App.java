@@ -188,6 +188,8 @@ public class App {
             case "--explain" -> new ExplainCommand(requireArg(argList, "--explain", "class name"));
             case "--batch" -> new BatchCommand();
             case "--unused" -> new UnusedCommand();
+            case "--similar" -> new SimilarCommand(requireArg(argList, "--similar", "class name"));
+            case "--watch" -> new WatchCommand();
             case "--stats" -> new MetricsCommand(requireArg(argList, "--stats", "class name"));
             case "--history" -> new HistoryCommand(requireArg(argList, "--history", "class name"));
             default -> new MethodSearchCommand(command); // method name search
