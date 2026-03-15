@@ -221,7 +221,7 @@ public class App {
                 Call Graph:
                   --callers <method>        Find all callers of a method
                   --callees <method>        Find all callees of a method
-                  --call-chain <method>     Trace call chains, generate Mermaid diagrams
+                  --call-chain <method> [outdir]  Trace call chains, generate Mermaid diagrams
 
                 Architecture:
                   --check [ruleId]          Check architecture rules
@@ -257,11 +257,24 @@ public class App {
                   --metrics                 Show execution metrics
                   --config <path>           Use specific config file
 
+                Method References (for <method> arguments):
+                  methodName                    All methods with that name
+                  Class.method                  Specific class
+                  pkg.Class.method              Qualified name (resolved to simple)
+                  Class.method(Type1,Type2)     Specific overload
+                  Class.method(HashMap<K,V>)    Generics stripped automatically
+
+                  If ambiguous, returns candidates list for disambiguation.
+
                 Examples:
                   jsrc src/main/java --overview --json
                   jsrc --classes --fields name,packageName --json
                   jsrc --callers processOrder --json
+                  jsrc --callers Service.processOrder --json
                   jsrc --smells --json
+                  jsrc --call-chain DocumentoXML.creaDocumento ./output --metrics
+                  jsrc --search _initMethod --json
+                  jsrc --index                        # re-index after code changes
                 """);
     }
 
