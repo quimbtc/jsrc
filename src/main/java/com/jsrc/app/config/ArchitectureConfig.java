@@ -9,10 +9,17 @@ public record ArchitectureConfig(
         List<LayerDef> layers,
         List<RuleDef> rules,
         List<String> endpointAnnotations,
-        List<InvokerDef> invokers
+        List<InvokerDef> invokers,
+        List<String> chainStopMethods
 ) {
     public static ArchitectureConfig empty() {
-        return new ArchitectureConfig(List.of(), List.of(), List.of(), List.of());
+        return new ArchitectureConfig(List.of(), List.of(), List.of(), List.of(), List.of());
+    }
+
+    /** Backward-compatible constructor without chainStopMethods. */
+    public ArchitectureConfig(List<LayerDef> layers, List<RuleDef> rules,
+                              List<String> endpointAnnotations, List<InvokerDef> invokers) {
+        this(layers, rules, endpointAnnotations, invokers, List.of());
     }
 
     /**

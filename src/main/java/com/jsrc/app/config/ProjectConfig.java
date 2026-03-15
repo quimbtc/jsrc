@@ -114,9 +114,12 @@ public record ProjectConfig(
             }
         }
 
+        List<String> chainStopMethods = getStringList(archMap, "chainStopMethods");
+
         return new ArchitectureConfig(
                 List.copyOf(layers), List.copyOf(rules),
-                List.copyOf(endpoints), List.copyOf(invokers));
+                List.copyOf(endpoints), List.copyOf(invokers),
+                List.copyOf(chainStopMethods));
     }
 
     @SuppressWarnings("unchecked")

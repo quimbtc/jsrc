@@ -37,7 +37,13 @@ public class CallChainCommand implements Command {
             }
         }
 
-        CallChainTracer tracer = new CallChainTracer(graphBuilder);
+        // Create tracer with stop methods from config (e.g. event handlers)
+        CallChainTracer tracer;
+        if (ctx.config() != null && !ctx.config().architecture().chainStopMethods().isEmpty()) {
+            tracer = new CallChainTracer(graphBuilder, ctx.config().architecture().chainStopMethods());
+        } else {
+            tracer = new CallChainTracer(graphBuilder);
+        }
         var chains = tracer.traceToRoots(methodName);
 
         ctx.formatter().printCallChains(chains, methodName);

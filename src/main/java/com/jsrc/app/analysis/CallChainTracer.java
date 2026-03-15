@@ -26,12 +26,17 @@ public class CallChainTracer {
 
     private final CallGraphBuilder graph;
     private final int maxDepth;
+    private final Set<String> stopMethods;
 
     public CallChainTracer(CallGraphBuilder graph) {
-        this(graph, 20);
+        this(graph, 20, Set.of());
     }
 
     public CallChainTracer(CallGraphBuilder graph, int maxDepth) {
+        this(graph, maxDepth, Set.of());
+    }
+
+    public CallChainTracer(CallGraphBuilder graph, int maxDepth, Set<String> stopMethods) {
         if (graph == null) {
             throw new IllegalArgumentException("CallGraphBuilder must not be null");
         }
@@ -40,6 +45,11 @@ public class CallChainTracer {
         }
         this.graph = graph;
         this.maxDepth = maxDepth;
+        this.stopMethods = stopMethods != null ? stopMethods : Set.of();
+    }
+
+    public CallChainTracer(CallGraphBuilder graph, java.util.List<String> stopMethods) {
+        this(graph, 20, new HashSet<>(stopMethods));
     }
 
     /**
@@ -86,6 +96,14 @@ public class CallChainTracer {
                      Set<MethodReference> visited, List<CallChain> result) {
         if (currentPath.size() >= maxDepth) {
             logger.debug("Max depth {} reached at {}", maxDepth, current.displayName());
+            if (!currentPath.isEmpty()) {
+                result.add(new CallChain(new ArrayList<>(currentPath)));
+            }
+            return;
+        }
+
+        // Stop at configured stop methods (e.g. event handlers) — treat as root
+        if (!stopMethods.isEmpty() && isStopMethod(current)) {
             if (!currentPath.isEmpty()) {
                 result.add(new CallChain(new ArrayList<>(currentPath)));
             }
@@ -154,6 +172,22 @@ public class CallChainTracer {
             fuzzy.addAll(graph.getCallersOf(registered));
         }
         return fuzzy;
+    }
+
+    /**
+     * Checks if the method matches a configured stop method pattern.
+     * Supports exact names (e.g. "actionPerformed") and prefix patterns (e.g. "get*").
+     */
+    private boolean isStopMethod(MethodReference method) {
+        String name = method.methodName();
+        for (String stop : stopMethods) {
+            if (stop.endsWith("*")) {
+                if (name.startsWith(stop.substring(0, stop.length() - 1))) return true;
+            } else {
+                if (name.equals(stop)) return true;
+            }
+        }
+        return false;
     }
 
     private boolean matchesParameterCount(MethodReference a, MethodReference b) {
