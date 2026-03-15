@@ -182,6 +182,11 @@ public class App {
             case "--diff" -> new DiffCommand();
             case "--changed" -> new ChangedCommand();
             case "--drift" -> new DriftCommand();
+            case "--search" -> new SearchCommand(requireMethodArg(argList, "--search"));
+            case "--imports" -> new ImportsCommand(requireArg(argList, "--imports", "class name"));
+            case "--packages" -> new PackagesCommand();
+            case "--explain" -> new ExplainCommand(requireArg(argList, "--explain", "class name"));
+            case "--batch" -> new BatchCommand();
             default -> new MethodSearchCommand(command); // method name search
         };
     }
