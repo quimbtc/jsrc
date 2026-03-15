@@ -44,11 +44,22 @@ public class SearchCommand implements Command {
                 for (IndexEntry entry : indexed) {
                     indexedPaths.add(entry.path());
                 }
-                filesToSearch = ctx.javaFiles().stream()
-                        .filter(f -> indexedPaths.contains(f.toString()))
+                List<Path> filtered = ctx.javaFiles().stream()
+                        .filter(f -> {
+                            String fStr = f.toString();
+                            for (String ip : indexedPaths) {
+                                if (fStr.endsWith(ip) || ip.endsWith(fStr)) return true;
+                            }
+                            return false;
+                        })
                         .toList();
-                logger.debug("Index narrowed search from {} to {} files for '{}'",
-                        ctx.javaFiles().size(), filesToSearch.size(), pattern);
+                if (!filtered.isEmpty()) {
+                    filesToSearch = filtered;
+                    logger.debug("Index narrowed search from {} to {} files for '{}'",
+                            ctx.javaFiles().size(), filesToSearch.size(), pattern);
+                } else {
+                    logger.debug("Index matched {} entries but no path overlap, falling back to full scan", indexed.size());
+                }
             }
         }
 
