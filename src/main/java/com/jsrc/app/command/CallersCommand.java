@@ -23,7 +23,11 @@ public class CallersCommand implements Command {
         String methodName = ref.methodName();
 
         CallGraphBuilder graphBuilder = new CallGraphBuilder();
-        graphBuilder.build(ctx.javaFiles());
+        if (ctx.indexed() != null && ctx.indexed().hasCallEdges()) {
+            graphBuilder.loadFromIndex(ctx.indexed().getEntries());
+        } else {
+            graphBuilder.build(ctx.javaFiles());
+        }
 
         var allTargets = graphBuilder.findMethodsByName(methodName);
         var targets = ref.hasParamTypes()

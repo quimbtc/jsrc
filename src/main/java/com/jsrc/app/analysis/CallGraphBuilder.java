@@ -51,7 +51,11 @@ public class CallGraphBuilder {
 
     /**
      * Parses all given files and builds the call graph.
-     * Clears any previously built state before starting.
+     * Uses two passes to avoid holding all ASTs in memory:
+     * <ol>
+     *   <li>Pass 1: register classes and fields (lightweight context only, AST discarded)</li>
+     *   <li>Pass 2: re-parse each file and analyze method calls (AST discarded after each file)</li>
+     * </ol>
      */
     public void build(List<Path> javaFiles) {
         callerIndex.clear();
@@ -59,23 +63,63 @@ public class CallGraphBuilder {
         allMethods.clear();
         methodsByName.clear();
 
-        Map<Path, CompilationUnit> compilationUnits = new HashMap<>();
         Map<String, ClassContext> classContexts = new HashMap<>();
 
+        // Pass 1: register class contexts (fields, method signatures) — no AST retained
         for (Path file : javaFiles) {
             CompilationUnit cu = parseFile(file);
             if (cu == null) continue;
-            compilationUnits.put(file, cu);
             registerClasses(cu, file, classContexts);
+            // cu goes out of scope → GC can reclaim
         }
 
-        for (var entry : compilationUnits.entrySet()) {
-            Path file = entry.getKey();
-            CompilationUnit cu = entry.getValue();
+        // Pass 2: re-parse and analyze calls one file at a time
+        for (Path file : javaFiles) {
+            CompilationUnit cu = parseFile(file);
+            if (cu == null) continue;
             analyzeMethodCalls(cu, file, classContexts);
+            // cu goes out of scope → GC can reclaim
         }
 
         logger.info("Call graph built: {} methods, {} call edges",
+                allMethods.size(), callerIndex.values().stream().mapToInt(Set::size).sum());
+    }
+
+    /**
+     * Loads the call graph from pre-computed index entries.
+     * Much faster than {@link #build(List)} — no file I/O or parsing needed.
+     */
+    public void loadFromIndex(List<com.jsrc.app.index.IndexEntry> entries) {
+        callerIndex.clear();
+        calleeIndex.clear();
+        allMethods.clear();
+        methodsByName.clear();
+
+        for (var entry : entries) {
+            // Register methods from classes
+            for (var ic : entry.classes()) {
+                for (var im : ic.methods()) {
+                    MethodReference ref = new MethodReference(ic.name(), im.name(), -1, null);
+                    allMethods.add(ref);
+                    methodsByName.computeIfAbsent(im.name(), k -> new HashSet<>()).add(ref);
+                }
+            }
+
+            // Load call edges
+            for (var edge : entry.callEdges()) {
+                MethodReference caller = new MethodReference(edge.callerClass(), edge.callerMethod(), -1, null);
+                MethodReference callee = new MethodReference(edge.calleeClass(), edge.calleeMethod(), -1, null);
+                MethodCall call = new MethodCall(caller, callee, edge.line());
+
+                allMethods.add(caller);
+                methodsByName.computeIfAbsent(edge.callerMethod(), k -> new HashSet<>()).add(caller);
+
+                calleeIndex.computeIfAbsent(caller, k -> new HashSet<>()).add(call);
+                callerIndex.computeIfAbsent(callee, k -> new HashSet<>()).add(call);
+            }
+        }
+
+        logger.info("Call graph loaded from index: {} methods, {} call edges",
                 allMethods.size(), callerIndex.values().stream().mapToInt(Set::size).sum());
     }
 

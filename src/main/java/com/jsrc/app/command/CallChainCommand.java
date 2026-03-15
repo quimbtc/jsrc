@@ -20,7 +20,11 @@ public class CallChainCommand implements Command {
     @Override
     public int execute(CommandContext ctx) {
         CallGraphBuilder graphBuilder = new CallGraphBuilder();
-        graphBuilder.build(ctx.javaFiles());
+        if (ctx.indexed() != null && ctx.indexed().hasCallEdges()) {
+            graphBuilder.loadFromIndex(ctx.indexed().getEntries());
+        } else {
+            graphBuilder.build(ctx.javaFiles());
+        }
 
         CallChainTracer tracer = new CallChainTracer(graphBuilder);
         var chains = tracer.traceToRoots(methodName);

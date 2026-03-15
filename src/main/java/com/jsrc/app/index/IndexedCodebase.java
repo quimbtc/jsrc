@@ -266,6 +266,20 @@ public class IndexedCodebase {
     }
 
     /**
+     * Returns the raw index entries (used by CallGraphBuilder.loadFromIndex).
+     */
+    public List<IndexEntry> getEntries() {
+        return entries;
+    }
+
+    /**
+     * Returns true if any entry has call edges indexed.
+     */
+    public boolean hasCallEdges() {
+        return entries.stream().anyMatch(e -> !e.callEdges().isEmpty());
+    }
+
+    /**
      * Returns the number of indexed files.
      */
     public int fileCount() {

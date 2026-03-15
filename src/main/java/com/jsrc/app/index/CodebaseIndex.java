@@ -19,6 +19,14 @@ import com.jsrc.app.parser.CodeParser;
 import com.jsrc.app.parser.model.ClassInfo;
 import com.jsrc.app.parser.model.MethodInfo;
 
+import com.github.javaparser.JavaParser;
+import com.github.javaparser.ast.CompilationUnit;
+import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
+import com.github.javaparser.ast.body.MethodDeclaration;
+import com.github.javaparser.ast.expr.MethodCallExpr;
+import com.github.javaparser.ast.expr.NameExpr;
+import com.github.javaparser.ast.expr.ThisExpr;
+
 /**
  * Builds and persists a codebase index for fast lookups.
  * Index is stored as JSON in {@code .jsrc/index.json}.
@@ -82,7 +90,10 @@ public class CodebaseIndex {
                         .map(ci -> toIndexedClass(ci, file, parser))
                         .toList();
 
-                entries.add(new IndexEntry(relativePath, hash, lastModified, indexed));
+                // Extract call edges from the same file
+                List<CallEdge> edges = extractCallEdges(file);
+
+                entries.add(new IndexEntry(relativePath, hash, lastModified, indexed, edges));
                 reindexed++;
             } catch (IOException ex) {
                 logger.error("Error indexing {}: {}", file, ex.getMessage());
@@ -160,7 +171,21 @@ public class CodebaseIndex {
                 }
             }
         }
-        return new IndexEntry(path, hash, lastModified, classes);
+        List<CallEdge> callEdges = new ArrayList<>();
+        Object edgesRaw = map.get("callEdges");
+        if (edgesRaw instanceof List<?> edgeList) {
+            for (Object e : edgeList) {
+                if (e instanceof Map<?, ?> em) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> edgeMap = (Map<String, Object>) em;
+                    callEdges.add(new CallEdge(
+                            str(edgeMap, "callerClass"), str(edgeMap, "callerMethod"),
+                            str(edgeMap, "calleeClass"), str(edgeMap, "calleeMethod"),
+                            intVal(edgeMap, "line")));
+                }
+            }
+        }
+        return new IndexEntry(path, hash, lastModified, classes, callEdges);
     }
 
     @SuppressWarnings("unchecked")
@@ -226,6 +251,45 @@ public class CodebaseIndex {
 
     // ---- internal ----
 
+    /**
+     * Extracts call edges from a Java file using JavaParser.
+     * Each edge represents a method call: caller → callee.
+     */
+    private List<CallEdge> extractCallEdges(Path file) {
+        List<CallEdge> edges = new ArrayList<>();
+        try {
+            String source = Files.readString(file);
+            var jp = new JavaParser();
+            var result = jp.parse(source);
+            if (!result.getResult().isPresent()) return edges;
+
+            CompilationUnit cu = result.getResult().get();
+            for (ClassOrInterfaceDeclaration cid : cu.findAll(ClassOrInterfaceDeclaration.class)) {
+                String className = cid.getNameAsString();
+                for (MethodDeclaration md : cid.getMethods()) {
+                    String methodName = md.getNameAsString();
+                    for (MethodCallExpr call : md.findAll(MethodCallExpr.class)) {
+                        String calleeMethod = call.getNameAsString();
+                        String calleeClass = resolveCalleeClass(call, className);
+                        int line = call.getBegin().map(p -> p.line).orElse(-1);
+                        edges.add(new CallEdge(className, methodName, calleeClass, calleeMethod, line));
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            logger.debug("Error extracting call edges from {}: {}", file, ex.getMessage());
+        }
+        return edges;
+    }
+
+    private static String resolveCalleeClass(MethodCallExpr call, String currentClass) {
+        if (call.getScope().isEmpty()) return currentClass;
+        var scope = call.getScope().get();
+        if (scope instanceof ThisExpr) return currentClass;
+        if (scope instanceof NameExpr ne) return ne.getNameAsString();
+        return "?";
+    }
+
     private IndexedClass toIndexedClass(ClassInfo ci, Path file, CodeParser parser) {
         List<IndexedMethod> methods = ci.methods().stream()
                 .map(m -> new IndexedMethod(
@@ -250,6 +314,19 @@ public class CodebaseIndex {
         map.put("contentHash", entry.contentHash());
         map.put("lastModified", entry.lastModified());
         map.put("classes", entry.classes().stream().map(this::classToMap).toList());
+        if (!entry.callEdges().isEmpty()) {
+            map.put("callEdges", entry.callEdges().stream().map(this::edgeToMap).toList());
+        }
+        return map;
+    }
+
+    private Map<String, Object> edgeToMap(CallEdge edge) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("callerClass", edge.callerClass());
+        map.put("callerMethod", edge.callerMethod());
+        map.put("calleeClass", edge.calleeClass());
+        map.put("calleeMethod", edge.calleeMethod());
+        map.put("line", edge.line());
         return map;
     }
 

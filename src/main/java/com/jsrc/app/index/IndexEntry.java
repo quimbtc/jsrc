@@ -14,5 +14,11 @@ public record IndexEntry(
         String path,
         String contentHash,
         long lastModified,
-        List<IndexedClass> classes
-) {}
+        List<IndexedClass> classes,
+        List<CallEdge> callEdges
+) {
+    /** Backward-compatible constructor for entries without call edges. */
+    public IndexEntry(String path, String contentHash, long lastModified, List<IndexedClass> classes) {
+        this(path, contentHash, lastModified, classes, List.of());
+    }
+}
