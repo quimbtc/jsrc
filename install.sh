@@ -48,6 +48,9 @@ check_java() {
     elif [[ -x "$HOME/.sdkman/candidates/java/current/bin/java" ]]; then
         java_bin="$HOME/.sdkman/candidates/java/current/bin/java"
         export PATH="$HOME/.sdkman/candidates/java/current/bin:$PATH"
+    elif [[ -x "$HOME/.sdkman/candidates/java/current/Contents/Home/bin/java" ]]; then
+        java_bin="$HOME/.sdkman/candidates/java/current/Contents/Home/bin/java"
+        export PATH="$HOME/.sdkman/candidates/java/current/Contents/Home/bin:$PATH"
     fi
     if [[ -n "$java_bin" ]]; then
         JAVA_VER=$($java_bin -version 2>&1 | head -1 | sed 's/.*"\([0-9]*\).*/\1/')
@@ -84,10 +87,15 @@ install_java() {
     sdk_cmd default java 22.0.2-tem
 
     # Find installed java directly (sdk runs in subshell, PATH not inherited)
+    # macOS JDKs use Contents/Home/bin/, Linux uses bin/ directly
     for candidate in "$HOME/.sdkman/candidates/java/22.0.2-tem" "$HOME/.sdkman/candidates/java/current"; do
         if [[ -x "$candidate/bin/java" ]]; then
             export JAVA_HOME="$candidate"
             export PATH="$candidate/bin:$PATH"
+            break
+        elif [[ -x "$candidate/Contents/Home/bin/java" ]]; then
+            export JAVA_HOME="$candidate/Contents/Home"
+            export PATH="$candidate/Contents/Home/bin:$PATH"
             break
         fi
     done
