@@ -12,6 +12,23 @@ MIN_JAVA_VERSION=22
 echo "=== jsrc installer ==="
 echo ""
 
+# ---- Check if already installed ----
+if command -v jsrc &>/dev/null; then
+    echo "jsrc is already installed: $(which jsrc)"
+    echo "Testing current installation..."
+    if jsrc --describe --json &>/dev/null; then
+        echo "✓ jsrc is working. Use 'jsrc --describe --json' to see commands."
+        read -p "Reinstall/update anyway? [y/N] " -n 1 -r
+        echo ""
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo "Aborted."
+            exit 0
+        fi
+    else
+        echo "⚠ jsrc found but not working. Reinstalling..."
+    fi
+fi
+
 # ---- Detect OS ----
 OS=$(uname -s)
 ARCH=$(uname -m)
@@ -188,6 +205,16 @@ if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
     echo ""
 fi
 
+# Verify installation works
+echo "Verifying installation..."
+if "$BIN_DIR/jsrc" --describe --json &>/dev/null; then
+    echo "✓ jsrc is working!"
+else
+    echo "⚠ jsrc installed but verification failed."
+    echo "  Try: source ~/.sdkman/bin/sdkman-init.sh && jsrc --describe --json"
+fi
+
+echo ""
 echo "Quick start:"
 echo ""
 echo "  jsrc --describe --json          # list all commands"
