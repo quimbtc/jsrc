@@ -69,13 +69,7 @@ public class CallChainCommand implements Command {
             targets = new java.util.HashSet<>();
             for (MethodReference target : allTargets) {
                 if (target.className().equals(ref.className())) {
-                    if (ref.hasParamTypes()) {
-                        if (target.parameterCount() < 0 || target.parameterCount() == ref.paramTypes().size()) {
-                            targets.add(target);
-                        }
-                    } else {
-                        targets.add(target);
-                    }
+                    targets.add(target);
                 }
             }
         } else {
@@ -120,6 +114,11 @@ public class CallChainCommand implements Command {
                 if (seen.add(chain.summary())) chains.add(chain);
             }
         }
+
+        // Note: overload filtering by param types is best-effort.
+        // The call graph edges don't carry arg count, so when loading from
+        // index, we can't distinguish which overload each caller invokes.
+        // The ambiguity check ensures the user is aware of overloads.
 
         ctx.formatter().printCallChains(chains, methodName, signatures);
 
