@@ -82,20 +82,23 @@ public class CallChainCommand implements Command {
             targets = allTargets;
         }
 
-        // Check for ambiguity: multiple classes with same method name
-        if (!ref.hasClassName() && targets.size() > 1) {
-            java.util.Set<String> classNames = new java.util.TreeSet<>();
+        // Check for ambiguity: multiple methods (different classes or overloads)
+        if (!ref.hasParamTypes() && targets.size() > 1) {
+            // Build unique signatures using param count to distinguish overloads
+            java.util.Set<String> candidates = new java.util.TreeSet<>();
             for (MethodReference t : targets) {
-                String sig = signatures.getOrDefault(t.className() + "." + t.methodName(), "()");
-                classNames.add(t.className() + "." + t.methodName() + sig);
+                String key = t.className() + "." + t.methodName() + "/" + t.parameterCount();
+                String sig = signatures.getOrDefault(key,
+                        signatures.getOrDefault(t.className() + "." + t.methodName(), "()"));
+                candidates.add(t.className() + "." + t.methodName() + sig);
             }
-            if (classNames.size() > 1) {
+            if (candidates.size() > 1) {
                 Map<String, Object> result = new java.util.LinkedHashMap<>();
                 result.put("ambiguous", true);
-                result.put("methodName", ref.methodName());
-                result.put("candidates", new java.util.ArrayList<>(classNames));
-                result.put("message", "Multiple methods named '" + ref.methodName()
-                        + "'. Use Class.method to disambiguate.");
+                result.put("methodName", ref.hasClassName()
+                        ? ref.className() + "." + ref.methodName() : ref.methodName());
+                result.put("candidates", new java.util.ArrayList<>(candidates));
+                result.put("message", "Multiple methods found. Use Class.method(Type1,Type2) to disambiguate.");
                 ctx.formatter().printResult(result);
                 return 0;
             }
