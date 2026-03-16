@@ -156,6 +156,34 @@ class SmellsCommandTest {
     }
 
     @Test
+    @DisplayName("Method target filters smells to that method only")
+    void methodTargetFiltersSmells() throws Exception {
+        writeFile("Service.java", """
+                public class Service {
+                    public void clean() {}
+                    public void smelly(int a, int b, int c, int d, int e,
+                                       int f, int g, int h) {}
+                }
+                """);
+
+        var ctx = buildIndexedContext();
+        // Ask for smells of "smelly" — should include smells
+        String output = captureStdout(() -> {
+            int result = new SmellsCommand("smelly").execute(ctx);
+            assertTrue(result >= 1, "Should detect smells in smelly method");
+        });
+        assertTrue(output.contains("smelly"), "Should include smelly method smells");
+
+        // Ask for smells of "clean" — should have no smells
+        String cleanOutput = captureStdout(() -> {
+            int result = new SmellsCommand("clean").execute(ctx);
+            assertEquals(0, result, "clean method should have no smells");
+        });
+        assertFalse(cleanOutput.contains("smelly"),
+                "Should NOT include smells from other methods");
+    }
+
+    @Test
     @DisplayName("Non-matching target prints error")
     void nonMatchingTargetShowsError() throws Exception {
         writeFile("Service.java", "public class Service { public void handle() {} }");

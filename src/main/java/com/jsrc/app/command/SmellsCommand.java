@@ -8,8 +8,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.jsrc.app.parser.model.CodeSmell;
 import com.jsrc.app.util.MethodResolver;
-import com.jsrc.app.util.MethodTargetResolver;
 import com.jsrc.app.util.SignatureUtils;
 
 /**
@@ -23,6 +23,7 @@ import com.jsrc.app.util.SignatureUtils;
  *   <li>A qualified reference — {@code Service.process(String, int)}</li>
  *   <li>A file path fragment — {@code src/main/Service.java}</li>
  * </ul>
+ * When a method target is specified, only smells within that method are returned.
  * When multiple classes contain the same method name, returns an ambiguity
  * response for the caller to disambiguate.
  */
@@ -59,79 +60,51 @@ public class SmellsCommand implements Command {
     }
 
     private int scanTarget(CommandContext ctx) {
-        // 1. Try direct file match first (class name or file path)
+        // 1. Try direct file/class match first
         List<Path> directMatches = findFileMatches(ctx.javaFiles(), target);
         if (!directMatches.isEmpty()) {
-            return scanFiles(ctx, directMatches);
+            return scanFiles(ctx, directMatches, null);
         }
 
-        // 2. Try as method reference — resolve via call graph for class discovery
+        // 2. Try as method reference via index
         if (ctx.indexed() != null) {
             var ref = MethodResolver.parse(target);
-            var signatures = MethodTargetResolver.buildSignatureMap(ctx.indexed());
-            var packages = MethodTargetResolver.buildClassPackageMap(ctx.indexed());
 
-            // Find classes containing this method from the index
+            // Use IndexedCodebase to find methods by name
+            var indexedMethods = ctx.indexed().findMethodsByName(ref.methodName());
+
+            // Filter by class name if specified
+            if (ref.hasClassName()) {
+                indexedMethods = indexedMethods.stream()
+                        .filter(m -> m.className().equals(ref.className()))
+                        .toList();
+            }
+
+            // Filter by param count if specified
+            if (ref.hasParamTypes()) {
+                int expectedCount = ref.paramTypes().size();
+                indexedMethods = indexedMethods.stream()
+                        .filter(m -> m.parameters().size() == expectedCount)
+                        .toList();
+            }
+
+            // Collect distinct class names
             Set<String> matchingClasses = new LinkedHashSet<>();
-            for (var entry : ctx.indexed().getEntries()) {
-                for (var ic : entry.classes()) {
-                    for (var im : ic.methods()) {
-                        if (im.name().equals(ref.methodName())) {
-                            if (ref.hasClassName() && !ic.name().equals(ref.className())) {
-                                continue;
-                            }
-                            if (ref.hasParamTypes()) {
-                                int paramCount = SignatureUtils.countParams(im.signature());
-                                if (paramCount >= 0 && paramCount != ref.paramTypes().size()) {
-                                    continue;
-                                }
-                            }
-                            matchingClasses.add(ic.name());
-                        }
-                    }
-                }
+            for (var m : indexedMethods) {
+                matchingClasses.add(m.className());
             }
 
+            // Check ambiguity: multiple classes, no class specified
             if (matchingClasses.size() > 1 && !ref.hasClassName()) {
-                // Ambiguous — build candidate list
-                List<String> candidates = new ArrayList<>();
-                for (var entry : ctx.indexed().getEntries()) {
-                    for (var ic : entry.classes()) {
-                        if (matchingClasses.contains(ic.name())) {
-                            for (var im : ic.methods()) {
-                                if (im.name().equals(ref.methodName())) {
-                                    String pkg = ic.packageName();
-                                    String qualified = pkg.isEmpty()
-                                            ? ic.name() : pkg + "." + ic.name();
-                                    String params = SignatureUtils.extractParams(im.signature());
-                                    candidates.add(qualified + "." + im.name() + params);
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Map<String, Object> result = new LinkedHashMap<>();
-                result.put("ambiguous", true);
-                result.put("target", target);
-                result.put("candidates", candidates.stream().sorted().distinct().toList());
-                result.put("message",
-                        "Multiple classes contain this method. Use Class.method to disambiguate.");
-                ctx.formatter().printResult(result);
-                return 0;
+                return reportAmbiguity(ctx, ref, matchingClasses);
             }
 
-            // Resolve class names to files
+            // Resolve class names to files and scan
             if (!matchingClasses.isEmpty()) {
-                List<Path> fileMatches = new ArrayList<>();
-                for (Path file : ctx.javaFiles()) {
-                    String fileName = file.getFileName().toString().replace(".java", "");
-                    if (matchingClasses.contains(fileName)) {
-                        fileMatches.add(file);
-                    }
-                }
+                List<Path> fileMatches = resolveClassesToFiles(ctx.javaFiles(), matchingClasses);
                 if (!fileMatches.isEmpty()) {
-                    return scanFiles(ctx, fileMatches);
+                    // Filter smells to only those in the requested method
+                    return scanFiles(ctx, fileMatches, ref.methodName());
                 }
             }
         }
@@ -140,14 +113,61 @@ public class SmellsCommand implements Command {
         return 0;
     }
 
-    private int scanFiles(CommandContext ctx, List<Path> files) {
+    private int reportAmbiguity(CommandContext ctx, MethodResolver.MethodRef ref,
+                                Set<String> matchingClasses) {
+        List<String> candidates = new ArrayList<>();
+        for (var entry : ctx.indexed().getEntries()) {
+            for (var ic : entry.classes()) {
+                if (!matchingClasses.contains(ic.name())) continue;
+                for (var im : ic.methods()) {
+                    if (!im.name().equals(ref.methodName())) continue;
+                    String pkg = ic.packageName();
+                    String qualified = pkg.isEmpty() ? ic.name() : pkg + "." + ic.name();
+                    String params = SignatureUtils.extractParams(im.signature());
+                    candidates.add(qualified + "." + im.name() + params);
+                }
+            }
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("ambiguous", true);
+        result.put("target", target);
+        result.put("candidates", candidates.stream().sorted().distinct().toList());
+        result.put("message",
+                "Multiple classes contain this method. Use Class.method to disambiguate.");
+        ctx.formatter().printResult(result);
+        return 0;
+    }
+
+    /**
+     * Scans files for smells, optionally filtering to a specific method.
+     *
+     * @param methodFilter if non-null, only return smells where methodName matches
+     */
+    private int scanFiles(CommandContext ctx, List<Path> files, String methodFilter) {
         int totalSmells = 0;
         for (Path file : files) {
             var smells = ctx.parser().detectSmells(file);
+            if (methodFilter != null) {
+                smells = smells.stream()
+                        .filter(s -> methodFilter.equals(s.methodName()))
+                        .toList();
+            }
             totalSmells += smells.size();
             ctx.formatter().printSmells(smells, file);
         }
         return totalSmells;
+    }
+
+    private List<Path> resolveClassesToFiles(List<Path> javaFiles, Set<String> classNames) {
+        List<Path> matches = new ArrayList<>();
+        for (Path file : javaFiles) {
+            String fileNameNoExt = file.getFileName().toString().replace(".java", "");
+            if (classNames.contains(fileNameNoExt)) {
+                matches.add(file);
+            }
+        }
+        return matches;
     }
 
     /**
