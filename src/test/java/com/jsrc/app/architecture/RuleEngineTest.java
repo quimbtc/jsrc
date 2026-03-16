@@ -135,4 +135,70 @@ class RuleEngineTest {
         assertFalse(violations.isEmpty());
         assertTrue(violations.stream().allMatch(v -> v.ruleId().equals("no-repo")));
     }
+
+    @Test
+    @DisplayName("require constructor-injection detects field-only injection")
+    void constructorInjectionViolation() throws Exception {
+        var layers = List.of(new LayerDef("service", "**/*Service", List.of()));
+        var rules = List.of(new RuleDef("ctor-inject", "Must use constructor injection",
+                null, "service", null, "constructor-injection", null));
+        var config = new ArchitectureConfig(layers, rules, List.of(), List.of());
+        var engine = new RuleEngine(config);
+
+        var classes = parseClasses("OrderService.java", """
+                public class OrderService {
+                    private OrderRepository repo;
+                    public void placeOrder() {}
+                }
+                """);
+
+        var files = List.of(tempDir.resolve("OrderService.java"));
+        var violations = engine.evaluate(classes, files);
+        assertFalse(violations.isEmpty(), "Should detect missing constructor injection");
+        assertTrue(violations.stream().anyMatch(v -> v.ruleId().equals("ctor-inject")));
+    }
+
+    @Test
+    @DisplayName("require constructor-injection passes with constructor deps")
+    void constructorInjectionClean() throws Exception {
+        var layers = List.of(new LayerDef("service", "**/*Service", List.of()));
+        var rules = List.of(new RuleDef("ctor-inject", "Must use constructor injection",
+                null, "service", null, "constructor-injection", null));
+        var config = new ArchitectureConfig(layers, rules, List.of(), List.of());
+        var engine = new RuleEngine(config);
+
+        var classes = parseClasses("OrderService.java", """
+                public class OrderService {
+                    private final OrderRepository repo;
+                    public OrderService(OrderRepository repo) {
+                        this.repo = repo;
+                    }
+                    public void placeOrder() {}
+                }
+                """);
+
+        var files = List.of(tempDir.resolve("OrderService.java"));
+        var violations = engine.evaluate(classes, files);
+        assertTrue(violations.isEmpty(), "Should have no violations with constructor injection");
+    }
+
+    @Test
+    @DisplayName("require constructor-injection skips interfaces")
+    void constructorInjectionSkipsInterfaces() throws Exception {
+        var layers = List.of(new LayerDef("service", "**/*Service", List.of()));
+        var rules = List.of(new RuleDef("ctor-inject", "Must use constructor injection",
+                null, "service", null, "constructor-injection", null));
+        var config = new ArchitectureConfig(layers, rules, List.of(), List.of());
+        var engine = new RuleEngine(config);
+
+        var classes = parseClasses("OrderService.java", """
+                public interface OrderService {
+                    void placeOrder();
+                }
+                """);
+
+        var files = List.of(tempDir.resolve("OrderService.java"));
+        var violations = engine.evaluate(classes, files);
+        assertTrue(violations.isEmpty(), "Interfaces should not trigger constructor-injection rule");
+    }
 }
