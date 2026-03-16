@@ -108,9 +108,10 @@ public class CallGraphBuilder {
                 }
             }
 
-            // Load call edges — use argCount for callee parameterCount when available
+            // Load call edges
             for (var edge : entry.callEdges()) {
-                MethodReference caller = new MethodReference(edge.callerClass(), edge.callerMethod(), -1, null);
+                // Resolve caller paramCount from registered methods when possible
+                MethodReference caller = resolveRegistered(edge.callerClass(), edge.callerMethod());
                 MethodReference callee = new MethodReference(edge.calleeClass(), edge.calleeMethod(),
                         edge.argCount(), null);
                 MethodCall call = new MethodCall(caller, callee, edge.line());
@@ -377,6 +378,20 @@ public class CallGraphBuilder {
      * Counts parameters from a method signature string.
      * E.g. "public void foo(String s, int x)" → 2, "void bar()" → 0.
      */
+    /**
+     * Finds a registered MethodReference by class+method name.
+     * Returns the first match, or a new MR with -1 if not found.
+     */
+    private MethodReference resolveRegistered(String className, String methodName) {
+        Set<MethodReference> byName = methodsByName.get(methodName);
+        if (byName != null) {
+            for (MethodReference ref : byName) {
+                if (ref.className().equals(className)) return ref;
+            }
+        }
+        return new MethodReference(className, methodName, -1, null);
+    }
+
     private static int countParamsInSignature(String signature) {
         if (signature == null || signature.isEmpty()) return -1;
         int open = signature.indexOf('(');
