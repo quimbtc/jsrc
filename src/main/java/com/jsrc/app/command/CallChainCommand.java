@@ -104,10 +104,19 @@ public class CallChainCommand implements Command {
             }
         }
 
-        ctx.formatter().printCallChains(chains, methodName, signatures);
+        // Identify dead-end roots (methods with no callers — potential dead code)
+        java.util.Set<String> deadEndRoots = new java.util.HashSet<>();
+        for (CallChain chain : chains) {
+            MethodReference root = chain.root();
+            if (graphBuilder.isRoot(root)) {
+                deadEndRoots.add(root.className() + "." + root.methodName());
+            }
+        }
+
+        ctx.formatter().printCallChains(chains, methodName, signatures, deadEndRoots);
 
         if (!chains.isEmpty()) {
-            MermaidDiagramGenerator generator = new MermaidDiagramGenerator(signatures);
+            MermaidDiagramGenerator generator = new MermaidDiagramGenerator(signatures, deadEndRoots);
             try {
                 var files = generator.writeAll(chains, Paths.get(outputDir), methodName);
                 for (Path file : files) {

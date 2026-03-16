@@ -244,6 +244,13 @@ public class TextFormatter implements OutputFormatter {
     @Override
     public void printCallChains(List<CallChain> chains, String methodName,
                                  java.util.Map<String, String> signatures) {
+        printCallChains(chains, methodName, signatures, java.util.Set.of());
+    }
+
+    @Override
+    public void printCallChains(List<CallChain> chains, String methodName,
+                                 java.util.Map<String, String> signatures,
+                                 java.util.Set<String> deadEndRoots) {
         if (chains.isEmpty()) {
             System.out.printf("No call chains found for method '%s'.%n", methodName);
             return;
@@ -252,7 +259,9 @@ public class TextFormatter implements OutputFormatter {
         System.out.printf("Found %d call chain(s):%n", chains.size());
         for (int i = 0; i < chains.size(); i++) {
             CallChain chain = chains.get(i);
-            System.out.printf("%n  Chain %d (depth %d):%n", i + 1, chain.depth());
+            String rootKey = chain.root().className() + "." + chain.root().methodName();
+            String deadEnd = deadEndRoots.contains(rootKey) ? " ⚠ DEAD END" : "";
+            System.out.printf("%n  Chain %d (depth %d)%s:%n", i + 1, chain.depth(), deadEnd);
             System.out.printf("    %s%n", chainSummary(chain, signatures));
             for (MethodCall step : chain.steps()) {
                 System.out.printf("    %s -> %s [line %d]%n",

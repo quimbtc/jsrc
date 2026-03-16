@@ -123,6 +123,12 @@ public interface OutputFormatter {
         printCallChains(chains, methodName);
     }
 
+    default void printCallChains(List<CallChain> chains, String methodName,
+                                  java.util.Map<String, String> signatures,
+                                  java.util.Set<String> deadEndRoots) {
+        printCallChains(chains, methodName, signatures);
+    }
+
     /**
      * Prints a generic result (Map or List) with field filtering applied.
      * Use this for commands that build ad-hoc result structures.

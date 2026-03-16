@@ -22,16 +22,24 @@ public class MermaidDiagramGenerator {
 
     private static final Logger logger = LoggerFactory.getLogger(MermaidDiagramGenerator.class);
     private final java.util.Map<String, String> signatures;
+    private final java.util.Set<String> deadEndRoots;
 
     public MermaidDiagramGenerator() {
-        this(java.util.Map.of());
+        this(java.util.Map.of(), java.util.Set.of());
+    }
+
+    public MermaidDiagramGenerator(java.util.Map<String, String> signatures) {
+        this(signatures, java.util.Set.of());
     }
 
     /**
-     * @param signatures map of "ClassName.methodName" → "(ParamType1, ParamType2)"
+     * @param signatures    map of "ClassName.methodName" → "(ParamType1, ParamType2)"
+     * @param deadEndRoots  set of "ClassName.methodName" keys for roots with no callers
      */
-    public MermaidDiagramGenerator(java.util.Map<String, String> signatures) {
+    public MermaidDiagramGenerator(java.util.Map<String, String> signatures,
+                                    java.util.Set<String> deadEndRoots) {
         this.signatures = signatures;
+        this.deadEndRoots = deadEndRoots;
     }
 
     /**
@@ -58,6 +66,11 @@ public class MermaidDiagramGenerator {
         }
 
         if (hasEntry) {
+            String rootKey = rootClass + "." + rootMethod;
+            boolean isDeadEnd = deadEndRoots.contains(rootKey);
+            if (isDeadEnd) {
+                sb.append("    Note over Entry: ⚠ No callers found (possible dead code)\n");
+            }
             sb.append("    Entry->>").append(rootClass).append(": ")
               .append(rootMethod).append(resolveParams(rootClass, rootMethod)).append("\n");
         }
