@@ -41,14 +41,18 @@ public record MethodReference(
     }
 
     /**
-     * Compact display: ClassName.methodName()
+     * Compact display: ClassName.methodName(N params)
      * <p>
      * Includes parameter count when known (>= 0) to distinguish overloads.
-     * E.g. "Service.process/2()" vs "Service.process/1()".
+     * E.g. "Service.process(2 params)" vs "Service.process(1 param)".
+     * When parameter count is unknown (-1), shows "ClassName.methodName()".
      */
     public String displayName() {
-        if (parameterCount >= 0) {
-            return className + "." + methodName + "/" + parameterCount + "()";
+        if (parameterCount > 1) {
+            return className + "." + methodName + "(" + parameterCount + " params)";
+        }
+        if (parameterCount == 1) {
+            return className + "." + methodName + "(1 param)";
         }
         return className + "." + methodName + "()";
     }
