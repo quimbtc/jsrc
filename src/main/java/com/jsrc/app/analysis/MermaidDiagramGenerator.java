@@ -68,7 +68,7 @@ public class MermaidDiagramGenerator {
             String from = step.caller().className();
             String to = step.callee().className();
             String method = step.callee().methodName();
-            String params = resolveParams(to, method);
+            String params = resolveParams(to, method, step.callee().parameterCount());
 
             // Skip unresolved "?" participants — bridge the gap
             if ("?".equals(to) && i + 1 < steps.size()) {
@@ -122,8 +122,18 @@ public class MermaidDiagramGenerator {
      * Returns "()" if no signature found.
      */
     private String resolveParams(String className, String methodName) {
-        // Fallback key without param count
         return signatures.getOrDefault(className + "." + methodName, "()");
+    }
+
+    /**
+     * Resolves params using the arg count from the call site edge.
+     */
+    private String resolveParams(String className, String methodName, int argCount) {
+        if (argCount >= 0) {
+            String keyed = signatures.get(className + "." + methodName + "/" + argCount);
+            if (keyed != null) return keyed;
+        }
+        return resolveParams(className, methodName);
     }
 
     private Set<String> collectParticipants(CallChain chain) {

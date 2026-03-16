@@ -119,11 +119,9 @@ public class CallChainCommand implements Command {
         if (ref.hasParamTypes()) {
             int expectedCount = ref.paramTypes().size();
             chains = chains.stream().filter(chain -> {
-                // Check the last step — the callee is the target method
                 MethodCall lastStep = chain.steps().getLast();
                 int calleeArgs = lastStep.callee().parameterCount();
-                if (calleeArgs >= 0) return calleeArgs == expectedCount;
-                return true; // can't verify, include
+                return calleeArgs < 0 || calleeArgs == expectedCount;
             }).toList();
         }
 

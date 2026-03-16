@@ -346,7 +346,14 @@ public class JsonFormatter implements OutputFormatter {
         map.put("className", ref.className());
         map.put("methodName", ref.methodName());
         String key = ref.className() + "." + ref.methodName();
-        String params = currentSignatures.getOrDefault(key, null);
+        // Try keyed by param count first (for overload disambiguation)
+        String params = null;
+        if (ref.parameterCount() >= 0) {
+            params = currentSignatures.get(key + "/" + ref.parameterCount());
+        }
+        if (params == null) {
+            params = currentSignatures.getOrDefault(key, null);
+        }
         if (params != null) {
             map.put("params", params);
         }

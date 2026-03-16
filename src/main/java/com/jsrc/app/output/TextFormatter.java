@@ -266,7 +266,14 @@ public class TextFormatter implements OutputFormatter {
     private static String displayWithParams(com.jsrc.app.parser.model.MethodReference ref,
                                              java.util.Map<String, String> signatures) {
         String key = ref.className() + "." + ref.methodName();
-        String params = signatures.getOrDefault(key, "()");
+        // Try keyed by param count first (for overload disambiguation)
+        String params = null;
+        if (ref.parameterCount() >= 0) {
+            params = signatures.get(key + "/" + ref.parameterCount());
+        }
+        if (params == null) {
+            params = signatures.getOrDefault(key, "()");
+        }
         return ref.className() + "." + ref.methodName() + params;
     }
 
