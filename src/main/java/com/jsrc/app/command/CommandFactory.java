@@ -21,7 +21,7 @@ public final class CommandFactory {
             case "--index" -> new IndexCommand();
             case "--overview" -> new OverviewCommand();
             case "--classes" -> new ClassesCommand();
-            case "--smells" -> new SmellsCommand();
+            case "--smells" -> new SmellsCommand(arg);
             case "--summary" -> arg != null ? new SummaryCommand(arg) : null;
             case "--hierarchy" -> arg != null ? new HierarchyCommand(arg) : null;
             case "--implements" -> arg != null ? new ImplementsCommand(arg) : null;

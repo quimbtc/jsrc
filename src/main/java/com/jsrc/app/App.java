@@ -212,7 +212,7 @@ public class App {
                   --hierarchy <class>       Extends, implements, subclasses
                   --implements <iface>      Find all implementors of an interface
                   --annotations <name>      Find classes/methods with annotation
-                  --smells                  Detect code smells
+                  --smells <class|--all>    Detect code smells (class or --all)
                   --stats <class>           Code metrics: LOC, complexity, coupling
                   --explain <class>         Concise actionable summary
                   --similar <class>         Find structurally similar classes
@@ -271,7 +271,8 @@ public class App {
                   jsrc --classes --fields name,packageName --json
                   jsrc --callers processOrder --json
                   jsrc --callers Service.processOrder --json
-                  jsrc --smells --json
+                  jsrc --smells OrderService
+                  jsrc --smells --all --json
                   jsrc --call-chain DocumentoXML.creaDocumento ./output --metrics
                   jsrc --search _initMethod --json
                   jsrc --index                        # re-index after code changes
