@@ -110,8 +110,10 @@ public class CallGraphBuilder {
 
             // Load call edges
             for (var edge : entry.callEdges()) {
-                // Resolve caller paramCount from registered methods when possible
-                MethodReference caller = resolveRegistered(edge.callerClass(), edge.callerMethod());
+                // Use callerParamCount from edge, fallback to registered method
+                MethodReference caller = edge.callerParamCount() >= 0
+                        ? new MethodReference(edge.callerClass(), edge.callerMethod(), edge.callerParamCount(), null)
+                        : resolveRegistered(edge.callerClass(), edge.callerMethod());
                 MethodReference callee = new MethodReference(edge.calleeClass(), edge.calleeMethod(),
                         edge.argCount(), null);
                 MethodCall call = new MethodCall(caller, callee, edge.line());

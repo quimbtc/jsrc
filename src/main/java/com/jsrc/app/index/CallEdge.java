@@ -12,14 +12,21 @@ package com.jsrc.app.index;
 public record CallEdge(
         String callerClass,
         String callerMethod,
+        int callerParamCount,
         String calleeClass,
         String calleeMethod,
         int line,
         int argCount
 ) {
-    /** Backward-compatible constructor without argCount. */
+    /** Backward-compatible constructor without callerParamCount and argCount. */
     public CallEdge(String callerClass, String callerMethod,
                     String calleeClass, String calleeMethod, int line) {
-        this(callerClass, callerMethod, calleeClass, calleeMethod, line, -1);
+        this(callerClass, callerMethod, -1, calleeClass, calleeMethod, line, -1);
+    }
+
+    /** Constructor without callerParamCount. */
+    public CallEdge(String callerClass, String callerMethod,
+                    String calleeClass, String calleeMethod, int line, int argCount) {
+        this(callerClass, callerMethod, -1, calleeClass, calleeMethod, line, argCount);
     }
 }

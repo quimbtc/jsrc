@@ -13,8 +13,13 @@ public class IndexCommand implements Command {
         Path root = Paths.get(ctx.rootPath());
         System.err.printf("Indexing %d Java files under '%s'...%n", ctx.javaFiles().size(), ctx.rootPath());
 
-        // Full re-index to ensure all edges have argCount
-        var existing = java.util.List.<com.jsrc.app.index.IndexEntry>of();
+        var existing = CodebaseIndex.load(root);
+        // Re-index entries that lack complete edge data (callerParamCount + argCount)
+        existing = existing.stream()
+                .filter(e -> !e.callEdges().isEmpty()
+                        && e.callEdges().stream().allMatch(
+                                edge -> edge.argCount() >= 0 && edge.callerParamCount() >= 0))
+                .toList();
         var index = new CodebaseIndex();
         var invokers = (ctx.config() != null)
                 ? ctx.config().architecture().invokers()

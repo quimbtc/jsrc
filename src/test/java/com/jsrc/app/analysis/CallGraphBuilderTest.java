@@ -381,6 +381,46 @@ class CallGraphBuilderTest {
                 "Should have 2 overloads of process, got: " + processes);
     }
 
+    @Test
+    @DisplayName("Overloaded callers produce separate edges in index-loaded graph")
+    void overloadedCallersDistinct() throws IOException {
+        Path file = writeFile("OverloadCaller.java", """
+                public class OverloadCaller {
+                    public void call(String s) { target(); }
+                    public void call(String s, int n) { other(); }
+                    private void target() {}
+                    private void other() {}
+                }
+                """);
+
+        // Build via index (exercises loadFromIndex + resolveRegistered)
+        var index = new com.jsrc.app.index.CodebaseIndex();
+        index.build(new com.jsrc.app.parser.HybridJavaParser(), List.of(file), tempDir, List.of());
+        var loaded = new CallGraphBuilder();
+        loaded.loadFromIndex(index.getEntries());
+
+        // call(String) should have callee "target"
+        // call(String,int) should have callee "other"
+        Set<MethodReference> calls = loaded.findMethodsByName("call");
+        assertTrue(calls.size() >= 2, "Should have 2 overloads of call: " + calls);
+
+        boolean call1HasTarget = false;
+        boolean call2HasOther = false;
+        for (MethodReference caller : calls) {
+            Set<MethodCall> callees = loaded.getCalleesOf(caller);
+            for (MethodCall c : callees) {
+                if (caller.parameterCount() == 1 && c.callee().methodName().equals("target")) {
+                    call1HasTarget = true;
+                }
+                if (caller.parameterCount() == 2 && c.callee().methodName().equals("other")) {
+                    call2HasOther = true;
+                }
+            }
+        }
+        assertTrue(call1HasTarget, "call(String) should call target()");
+        assertTrue(call2HasOther, "call(String,int) should call other()");
+    }
+
     private Path writeFile(String name, String content) throws IOException {
         Path file = tempDir.resolve(name);
         Files.writeString(file, content);

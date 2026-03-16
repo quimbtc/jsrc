@@ -193,9 +193,11 @@ public class CodebaseIndex {
                 if (e instanceof Map<?, ?> em) {
                     @SuppressWarnings("unchecked")
                     Map<String, Object> edgeMap = (Map<String, Object>) em;
+                    int callerParamCount = edgeMap.containsKey("callerParamCount") ? intVal(edgeMap, "callerParamCount") : -1;
                     int argCount = edgeMap.containsKey("argCount") ? intVal(edgeMap, "argCount") : -1;
                     callEdges.add(new CallEdge(
                             str(edgeMap, "callerClass"), str(edgeMap, "callerMethod"),
+                            callerParamCount,
                             str(edgeMap, "calleeClass"), str(edgeMap, "calleeMethod"),
                             intVal(edgeMap, "line"), argCount));
                 }
@@ -296,10 +298,12 @@ public class CodebaseIndex {
                 }
 
                 for (MethodDeclaration md : cid.getMethods()) {
-                    extractEdgesFromCallable(edges, md, className, md.getNameAsString(), fieldTypes);
+                    extractEdgesFromCallable(edges, md, className, md.getNameAsString(),
+                            md.getParameters().size(), fieldTypes);
                 }
                 for (com.github.javaparser.ast.body.ConstructorDeclaration cd : cid.getConstructors()) {
-                    extractEdgesFromCallable(edges, cd, className, className, fieldTypes);
+                    extractEdgesFromCallable(edges, cd, className, className,
+                            cd.getParameters().size(), fieldTypes);
                 }
             }
         } catch (Exception ex) {
@@ -314,6 +318,7 @@ public class CodebaseIndex {
     private static void extractEdgesFromCallable(List<CallEdge> edges,
                                                   com.github.javaparser.ast.body.CallableDeclaration<?> callable,
                                                   String className, String callerMethod,
+                                                  int callerParamCount,
                                                   Map<String, String> fieldTypes) {
         Map<String, String> localTypes = new HashMap<>();
         for (com.github.javaparser.ast.body.Parameter param : callable.getParameters()) {
@@ -336,13 +341,13 @@ public class CodebaseIndex {
             String calleeClass = resolveCalleeClass(call, className, fieldTypes, localTypes);
             int line = call.getBegin().map(p -> p.line).orElse(-1);
             int argCount = call.getArguments().size();
-            edges.add(new CallEdge(className, callerMethod, calleeClass, calleeMethod, line, argCount));
+            edges.add(new CallEdge(className, callerMethod, callerParamCount, calleeClass, calleeMethod, line, argCount));
         }
         for (ObjectCreationExpr newExpr : callable.findAll(ObjectCreationExpr.class)) {
             String targetClass = newExpr.getType().getNameAsString();
             int line = newExpr.getBegin().map(p -> p.line).orElse(-1);
             int argCount = newExpr.getArguments().size();
-            edges.add(new CallEdge(className, callerMethod, targetClass, targetClass, line, argCount));
+            edges.add(new CallEdge(className, callerMethod, callerParamCount, targetClass, targetClass, line, argCount));
         }
     }
 
@@ -454,6 +459,9 @@ public class CodebaseIndex {
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("callerClass", edge.callerClass());
         map.put("callerMethod", edge.callerMethod());
+        if (edge.callerParamCount() >= 0) {
+            map.put("callerParamCount", edge.callerParamCount());
+        }
         map.put("calleeClass", edge.calleeClass());
         map.put("calleeMethod", edge.calleeMethod());
         map.put("line", edge.line());
