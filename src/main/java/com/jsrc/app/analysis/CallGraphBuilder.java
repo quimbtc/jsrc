@@ -101,7 +101,8 @@ public class CallGraphBuilder {
             // Register methods from classes
             for (var ic : entry.classes()) {
                 for (var im : ic.methods()) {
-                    MethodReference ref = new MethodReference(ic.name(), im.name(), -1, null);
+                    int paramCount = countParamsInSignature(im.signature());
+                    MethodReference ref = new MethodReference(ic.name(), im.name(), paramCount, null);
                     allMethods.add(ref);
                     methodsByName.computeIfAbsent(im.name(), k -> new HashSet<>()).add(ref);
                 }
@@ -382,6 +383,28 @@ public class CallGraphBuilder {
             logger.debug("Error reading {}: {}", path, ex.getMessage());
         }
         return null;
+    }
+
+    /**
+     * Counts parameters from a method signature string.
+     * E.g. "public void foo(String s, int x)" → 2, "void bar()" → 0.
+     */
+    private static int countParamsInSignature(String signature) {
+        if (signature == null || signature.isEmpty()) return -1;
+        int open = signature.indexOf('(');
+        int close = signature.lastIndexOf(')');
+        if (open < 0 || close <= open) return -1;
+        String inner = signature.substring(open + 1, close).trim();
+        if (inner.isEmpty()) return 0;
+        // Strip generics before counting commas
+        int depth = 0;
+        int count = 1;
+        for (char c : inner.toCharArray()) {
+            if (c == '<') depth++;
+            else if (c == '>') depth--;
+            else if (c == ',' && depth == 0) count++;
+        }
+        return count;
     }
 
     private static class ClassContext {

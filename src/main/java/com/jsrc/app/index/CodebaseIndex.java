@@ -338,6 +338,15 @@ public class CodebaseIndex {
                         if (gi > 0) pType = pType.substring(0, gi);
                         ctorTypes.put(param.getNameAsString(), pType);
                     }
+                    for (com.github.javaparser.ast.body.VariableDeclarator var : cd.findAll(com.github.javaparser.ast.body.VariableDeclarator.class)) {
+                        var parent = var.getParentNode().orElse(null);
+                        if (parent != null && !(parent instanceof com.github.javaparser.ast.body.FieldDeclaration)) {
+                            String vType = var.getTypeAsString();
+                            int gi = vType.indexOf('<');
+                            if (gi > 0) vType = vType.substring(0, gi);
+                            ctorTypes.put(var.getNameAsString(), vType);
+                        }
+                    }
                     for (MethodCallExpr call : cd.findAll(MethodCallExpr.class)) {
                         String calleeMethod = call.getNameAsString();
                         String calleeClass = resolveCalleeClass(call, className, fieldTypes, ctorTypes);

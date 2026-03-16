@@ -51,14 +51,19 @@ public record MethodReference(
     public boolean equals(Object o) {
         if (this == o) return true;
         if (!(o instanceof MethodReference that)) return false;
-        return className.equals(that.className)
-                && methodName.equals(that.methodName)
-                && parameterCount == that.parameterCount;
+        if (!className.equals(that.className)) return false;
+        if (!methodName.equals(that.methodName)) return false;
+        // -1 means unknown param count — matches any
+        if (parameterCount >= 0 && that.parameterCount >= 0) {
+            return parameterCount == that.parameterCount;
+        }
+        return true;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(className, methodName, parameterCount);
+        // Don't include parameterCount — it can be -1 (unknown)
+        return Objects.hash(className, methodName);
     }
 
     @Override
