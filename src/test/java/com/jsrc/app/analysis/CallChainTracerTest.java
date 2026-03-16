@@ -262,6 +262,49 @@ class CallChainTracerTest {
         }
     }
 
+    @Test
+    @DisplayName("Should trace separate chains for overloaded method calls")
+    void shouldTraceSeparateChainsForOverloads() throws IOException {
+        // Reproduces the bug: pxAceptarFacturacion calls two overloads of generaDocumentos
+        // Both chains should appear — the dedup by summary() must not collapse them
+        Path docs = writeFile("GeneracionDocumentos.java", """
+                public class GeneracionDocumentos {
+                    public Object generaDocumentos(Integer id) {
+                        return _generaDocumentos(id);
+                    }
+                    public Object generaDocumentos(Integer id, Object dir) {
+                        return _generaDocumentos(id, dir);
+                    }
+                    private Object _generaDocumentos(Integer id) { return null; }
+                    private Object _generaDocumentos(Integer id, Object dir) { return null; }
+                }
+                """);
+        Path caller = writeFile("Caller.java", """
+                public class Caller {
+                    private GeneracionDocumentos docs = new GeneracionDocumentos();
+                    public void pxAceptar() {
+                        Object a = docs.generaDocumentos(1, null);
+                        Object b = docs.generaDocumentos(1);
+                    }
+                }
+                """);
+
+        CallGraphBuilder graph = buildGraph(docs, caller);
+        CallChainTracer tracer = new CallChainTracer(graph);
+
+        // Trace to _generaDocumentos — should find 2 chains (one per overload)
+        List<CallChain> chains = tracer.traceToRoots("_generaDocumentos");
+        assertEquals(2, chains.size(),
+                "Should find 2 separate chains for 2 overloads of _generaDocumentos. Got: "
+                + chains.stream().map(CallChain::summary).toList());
+
+        // Verify each chain has a distinct summary
+        String summary1 = chains.get(0).summary();
+        String summary2 = chains.get(1).summary();
+        assertNotEquals(summary1, summary2,
+                "Overloaded chains should have different summaries");
+    }
+
     private CallGraphBuilder buildGraph(Path... files) {
         CallGraphBuilder graph = new CallGraphBuilder();
         graph.build(List.of(files));

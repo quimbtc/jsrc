@@ -100,8 +100,8 @@ class MermaidDiagramGeneratorTest {
 
         String diagram = generator.generate(chain);
         assertTrue(diagram.startsWith("%%"), "Diagram should start with a comment");
-        assertTrue(diagram.contains("A.start()"));
-        assertTrue(diagram.contains("B.finish()"));
+        assertTrue(diagram.contains("A.start"), "Should contain caller method name");
+        assertTrue(diagram.contains("B.finish"), "Should contain callee method name");
     }
 
     @Test
