@@ -112,6 +112,52 @@ class MethodResolverTest {
         assertEquals("ServiceA", filtered.getFirst().className());
     }
 
+    // ---- stripGenerics ----
+
+    @Test
+    @DisplayName("Parse strips simple generics from params")
+    void stripSimpleGenerics() {
+        var ref = MethodResolver.parse("foo(HashMap<String,Integer>,List<Foo>)");
+        assertTrue(ref.hasParamTypes());
+        assertEquals(List.of("HashMap", "List"), ref.paramTypes());
+    }
+
+    @Test
+    @DisplayName("Parse strips nested generics from params")
+    void stripNestedGenerics() {
+        var ref = MethodResolver.parse("foo(Map<String,List<Integer>>,Set<Map<K,V>>)");
+        assertTrue(ref.hasParamTypes());
+        assertEquals(List.of("Map", "Set"), ref.paramTypes());
+    }
+
+    // ---- qualified names ----
+
+    @Test
+    @DisplayName("Parse extracts simple name from qualified class name")
+    void qualifiedClassName() {
+        var ref = MethodResolver.parse("com.foo.bar.MyService.process");
+        assertEquals("MyService", ref.className());
+        assertEquals("process", ref.methodName());
+    }
+
+    @Test
+    @DisplayName("Parse qualified name with params")
+    void qualifiedClassNameWithParams() {
+        var ref = MethodResolver.parse("com.foo.MyService.process(String,int)");
+        assertEquals("MyService", ref.className());
+        assertEquals("process", ref.methodName());
+        assertEquals(List.of("String", "int"), ref.paramTypes());
+    }
+
+    @Test
+    @DisplayName("Parse qualified name with nested generics in params")
+    void qualifiedNameWithGenerics() {
+        var ref = MethodResolver.parse("com.foo.Svc.run(HashMap<String,List<Integer>>,Double)");
+        assertEquals("Svc", ref.className());
+        assertEquals("run", ref.methodName());
+        assertEquals(List.of("HashMap", "Double"), ref.paramTypes());
+    }
+
     private MethodInfo method(String name, List<ParameterInfo> params) {
         return MethodInfo.basic(name, "Service", 1, 10, "void", List.of("public"), params, "");
     }

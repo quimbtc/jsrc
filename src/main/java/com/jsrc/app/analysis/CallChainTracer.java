@@ -94,14 +94,6 @@ public class CallChainTracer {
             return;
         }
 
-        // Stop at configured stop methods (e.g. event handlers) — treat as root
-        if (!stopMethods.isEmpty() && isStopMethod(current)) {
-            if (!currentPath.isEmpty()) {
-                result.add(new CallChain(new ArrayList<>(currentPath)));
-            }
-            return;
-        }
-
         Set<MethodCall> callerCalls = findCallers(current);
 
         if (callerCalls.isEmpty()) {
@@ -115,6 +107,15 @@ public class CallChainTracer {
         for (MethodCall call : callerCalls) {
             MethodReference caller = call.caller();
             if (visited.contains(caller)) {
+                continue;
+            }
+
+            // Stop at configured stop methods — emit chain with current as root
+            if (!stopMethods.isEmpty() && isStopMethod(caller)) {
+                currentPath.addFirst(call);
+                result.add(new CallChain(new ArrayList<>(currentPath)));
+                currentPath.removeFirst();
+                anyBranchFollowed = true;
                 continue;
             }
 

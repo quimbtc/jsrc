@@ -260,6 +260,127 @@ class CallGraphBuilderTest {
                 "Should strip <String> from Holder<String> and resolve to Holder");
     }
 
+    // ---- loadFromIndex ----
+
+    @Test
+    @DisplayName("loadFromIndex reconstructs call graph from index entries")
+    void loadFromIndex() throws IOException {
+        Path file = writeFile("Svc.java", """
+                public class Svc {
+                    public void a() { b(); }
+                    public void b() {}
+                }
+                """);
+        // Build index
+        var index = new com.jsrc.app.index.CodebaseIndex();
+        index.build(new com.jsrc.app.parser.HybridJavaParser(), List.of(file), tempDir, List.of());
+
+        // Load from index
+        var loaded = new CallGraphBuilder();
+        loaded.loadFromIndex(index.getEntries());
+
+        assertFalse(loaded.getAllMethods().isEmpty(), "Should have methods");
+        assertFalse(loaded.findMethodsByName("a").isEmpty(), "Should find method 'a'");
+        assertFalse(loaded.findMethodsByName("b").isEmpty(), "Should find method 'b'");
+
+        // Verify edge: a -> b
+        Set<MethodReference> aRefs = loaded.findMethodsByName("a");
+        for (MethodReference a : aRefs) {
+            Set<MethodCall> callees = loaded.getCalleesOf(a);
+            assertTrue(callees.stream().anyMatch(c -> c.callee().methodName().equals("b")),
+                    "Method 'a' should call 'b'");
+        }
+    }
+
+    // ---- addEdge ----
+
+    @Test
+    @DisplayName("addEdge injects external edges into call graph")
+    void addEdge() {
+        MethodReference caller = new MethodReference("Ext", "invoke", 1, null);
+        MethodReference callee = new MethodReference("Svc", "process", 1, null);
+        MethodCall edge = new MethodCall(caller, callee, 42);
+
+        builder.addEdge(edge);
+
+        assertTrue(builder.getAllMethods().contains(caller));
+        assertTrue(builder.getAllMethods().contains(callee));
+        assertTrue(builder.getCalleesOf(caller).contains(edge));
+        assertTrue(builder.getCallersOf(callee).contains(edge));
+    }
+
+    // ---- Constructor support ----
+
+    @Test
+    @DisplayName("Constructor body calls are included in call graph")
+    void constructorCallsRegistered() throws IOException {
+        Path file = writeFile("Foo.java", """
+                public class Foo {
+                    public Foo() { init(); }
+                    private void init() {}
+                }
+                """);
+        builder.build(List.of(file));
+
+        Set<MethodReference> ctors = builder.findMethodsByName("Foo");
+        assertFalse(ctors.isEmpty(), "Constructor should be registered as Foo.Foo");
+
+        // Constructor should call init
+        for (MethodReference ctor : ctors) {
+            Set<MethodCall> callees = builder.getCalleesOf(ctor);
+            assertTrue(callees.stream().anyMatch(c -> c.callee().methodName().equals("init")),
+                    "Constructor should call init()");
+        }
+    }
+
+    @Test
+    @DisplayName("new Foo() creates edge to constructor")
+    void objectCreationEdge() throws IOException {
+        Path bar = writeFile("Bar.java", """
+                public class Bar {
+                    public Bar() {}
+                }
+                """);
+        Path caller = writeFile("Caller.java", """
+                public class Caller {
+                    public void run() { new Bar(); }
+                }
+                """);
+        builder.build(List.of(bar, caller));
+
+        Set<MethodReference> runs = builder.findMethodsByName("run");
+        assertFalse(runs.isEmpty());
+        for (MethodReference run : runs) {
+            Set<MethodCall> callees = builder.getCalleesOf(run);
+            assertTrue(callees.stream().anyMatch(c ->
+                    c.callee().className().equals("Bar") && c.callee().methodName().equals("Bar")),
+                    "run() should have edge to new Bar()");
+        }
+    }
+
+    // ---- countParamsInSignature ----
+
+    @Test
+    @DisplayName("loadFromIndex preserves param count from signatures")
+    void loadFromIndexParamCount() throws IOException {
+        Path file = writeFile("Multi.java", """
+                public class Multi {
+                    public void process(String s) {}
+                    public void process(String s, int n) {}
+                }
+                """);
+        var index = new com.jsrc.app.index.CodebaseIndex();
+        index.build(new com.jsrc.app.parser.HybridJavaParser(), List.of(file), tempDir, List.of());
+
+        var loaded = new CallGraphBuilder();
+        loaded.loadFromIndex(index.getEntries());
+
+        Set<MethodReference> processes = loaded.findMethodsByName("process");
+        // Should have 2 distinct overloads
+        assertTrue(processes.size() >= 2,
+                "Should have 2 overloads of process, got: " + processes);
+    }
+
     private Path writeFile(String name, String content) throws IOException {
         Path file = tempDir.resolve(name);
         Files.writeString(file, content);

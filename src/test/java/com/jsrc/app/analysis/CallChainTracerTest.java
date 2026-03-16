@@ -188,6 +188,80 @@ class CallChainTracerTest {
         assertThrows(IllegalArgumentException.class, () -> new CallChainTracer(graph, 0, java.util.Set.of()));
     }
 
+    // ---- stopMethods ----
+
+    @Test
+    @DisplayName("stopMethods cuts chain at exact method name")
+    void stopMethodExact() throws IOException {
+        Path file = writeFile("StopTest.java", """
+                public class StopTest {
+                    public void start() { middle(); }
+                    public void middle() { end(); }
+                    public void end() {}
+                }
+                """);
+
+        CallGraphBuilder graph = buildGraph(file);
+        CallChainTracer tracer = new CallChainTracer(graph, 20, java.util.Set.of("start"));
+        List<CallChain> chains = tracer.traceToRoots("end");
+
+        assertFalse(chains.isEmpty(), "Should find chains");
+        for (CallChain chain : chains) {
+            // Chain root should be 'start' (the stop method becomes the entry point)
+            // It should NOT trace further up beyond the stop method
+            assertEquals("start", chain.root().methodName(),
+                    "Stop method should be the chain root. Root: " + chain.root());
+            // Depth should be 2: start→middle→end, not deeper
+            assertTrue(chain.depth() <= 2,
+                    "Chain should not go beyond stop method. Depth: " + chain.depth());
+        }
+    }
+
+    @Test
+    @DisplayName("stopMethods with glob prefix pattern")
+    void stopMethodGlobPrefix() throws IOException {
+        Path file = writeFile("ViewTest.java", """
+                public class ViewTest {
+                    public void getBtnSave() { doSave(); }
+                    public void doSave() { save(); }
+                    public void save() {}
+                }
+                """);
+
+        CallGraphBuilder graph = buildGraph(file);
+        CallChainTracer tracer = new CallChainTracer(graph, 20, java.util.Set.of("getBtn*"));
+        List<CallChain> chains = tracer.traceToRoots("save");
+
+        assertFalse(chains.isEmpty());
+        for (CallChain chain : chains) {
+            // getBtnSave is the stop method — it becomes the root (entry point)
+            assertEquals("getBtnSave", chain.root().methodName(),
+                    "Stop method should be chain root. Root: " + chain.root());
+        }
+    }
+
+    @Test
+    @DisplayName("stopMethods with glob contains pattern")
+    void stopMethodGlobContains() throws IOException {
+        Path file = writeFile("PanelTest.java", """
+                public class PanelTest {
+                    public void getSeleccionarBtn() { doAction(); }
+                    public void doAction() { work(); }
+                    public void work() {}
+                }
+                """);
+
+        CallGraphBuilder graph = buildGraph(file);
+        CallChainTracer tracer = new CallChainTracer(graph, 20, java.util.Set.of("get*Btn"));
+        List<CallChain> chains = tracer.traceToRoots("work");
+
+        assertFalse(chains.isEmpty());
+        for (CallChain chain : chains) {
+            assertEquals("getSeleccionarBtn", chain.root().methodName(),
+                    "Stop method should be chain root. Root: " + chain.root());
+        }
+    }
+
     private CallGraphBuilder buildGraph(Path... files) {
         CallGraphBuilder graph = new CallGraphBuilder();
         graph.build(List.of(files));
