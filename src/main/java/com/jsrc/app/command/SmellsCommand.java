@@ -10,6 +10,7 @@ import java.util.Set;
 
 import com.jsrc.app.util.MethodResolver;
 import com.jsrc.app.util.MethodTargetResolver;
+import com.jsrc.app.util.SignatureUtils;
 
 /**
  * Detects code smells in Java source files.
@@ -80,7 +81,7 @@ public class SmellsCommand implements Command {
                                 continue;
                             }
                             if (ref.hasParamTypes()) {
-                                int paramCount = countParamsInSignature(im.signature());
+                                int paramCount = SignatureUtils.countParams(im.signature());
                                 if (paramCount >= 0 && paramCount != ref.paramTypes().size()) {
                                     continue;
                                 }
@@ -102,7 +103,7 @@ public class SmellsCommand implements Command {
                                     String pkg = ic.packageName();
                                     String qualified = pkg.isEmpty()
                                             ? ic.name() : pkg + "." + ic.name();
-                                    String params = extractParams(im.signature());
+                                    String params = SignatureUtils.extractParams(im.signature());
                                     candidates.add(qualified + "." + im.name() + params);
                                 }
                             }
@@ -150,10 +151,10 @@ public class SmellsCommand implements Command {
     }
 
     /**
-     * Finds files matching a target by class name, file name, or path fragment.
+     * Finds files matching a target by exact class name, exact file name,
+     * or path ending with the target (for partial paths like "src/main/Service.java").
      */
     private List<Path> findFileMatches(List<Path> javaFiles, String target) {
-        // Strip .java extension from target for comparison
         String cleanTarget = target.endsWith(".java")
                 ? target.substring(0, target.length() - 5) : target;
 
@@ -164,35 +165,11 @@ public class SmellsCommand implements Command {
 
             if (fileNameNoExt.equals(cleanTarget)
                     || fileName.equals(target)
-                    || file.toString().contains(target)) {
+                    || file.toString().endsWith(target)) {
                 matches.add(file);
             }
         }
         return matches;
-    }
-
-    private static int countParamsInSignature(String signature) {
-        if (signature == null || signature.isEmpty()) return -1;
-        int open = signature.indexOf('(');
-        int close = signature.lastIndexOf(')');
-        if (open < 0 || close <= open) return -1;
-        String inner = signature.substring(open + 1, close).trim();
-        if (inner.isEmpty()) return 0;
-        int depth = 0;
-        int count = 1;
-        for (char c : inner.toCharArray()) {
-            if (c == '<') depth++;
-            else if (c == '>') depth--;
-            else if (c == ',' && depth == 0) count++;
-        }
-        return count;
-    }
-
-    private static String extractParams(String signature) {
-        int open = signature.indexOf('(');
-        int close = signature.lastIndexOf(')');
-        if (open < 0 || close < 0 || close <= open) return "()";
-        return signature.substring(open, close + 1);
     }
 
     private void printUsage() {
