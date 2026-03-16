@@ -4,11 +4,10 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
-
 import com.jsrc.app.architecture.InvokerResolver;
 import com.jsrc.app.analysis.CallGraphBuilder;
 import com.jsrc.app.util.MethodResolver;
+import com.jsrc.app.util.MethodTargetResolver;
 
 public class CallersCommand implements Command {
     private final String methodInput;
@@ -29,11 +28,8 @@ public class CallersCommand implements Command {
             graphBuilder.build(ctx.javaFiles());
         }
 
-        var allTargets = graphBuilder.findMethodsByName(methodName);
-        var targets = allTargets.stream()
-                .filter(t -> !ref.hasClassName() || t.className().equals(ref.className()))
-                .filter(t -> !ref.hasParamTypes() || t.parameterCount() == ref.paramTypes().size())
-                .collect(Collectors.toSet());
+        var resolved = MethodTargetResolver.resolve(ref, graphBuilder);
+        var targets = resolved.targets();
 
         List<Map<String, Object>> callers = new ArrayList<>();
         for (var target : targets) {

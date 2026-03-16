@@ -19,6 +19,7 @@ import com.jsrc.app.parser.model.CallChain;
 import com.jsrc.app.parser.model.MethodCall;
 import com.jsrc.app.parser.model.MethodReference;
 import com.jsrc.app.util.MethodResolver;
+import com.jsrc.app.util.MethodTargetResolver;
 
 public class CallChainCommand implements Command {
     private final String methodName;
@@ -59,53 +60,23 @@ public class CallChainCommand implements Command {
         // Build signature map from index for enriched output and disambiguation
         Map<String, String> signatures = buildSignatureMap(ctx);
 
-        // Parse input: supports methodName, Class.method, Class.method(Type1,Type2)
+        // Resolve targets using centralized resolver
         var ref = MethodResolver.parse(methodName);
-        java.util.Set<MethodReference> allTargets = graphBuilder.findMethodsByName(ref.methodName());
+        var resolved = MethodTargetResolver.resolve(ref, graphBuilder);
 
-        // Filter by class if specified
-        java.util.Set<MethodReference> targets;
-        if (ref.hasClassName()) {
-            targets = new java.util.HashSet<>();
-            for (MethodReference target : allTargets) {
-                if (target.className().equals(ref.className())) {
-                    targets.add(target);
-                }
-            }
-        } else {
-            targets = allTargets;
+        if (resolved.isAmbiguous()) {
+            var candidates = MethodTargetResolver.buildCandidates(resolved.targets(), signatures);
+            Map<String, Object> result = new java.util.LinkedHashMap<>();
+            result.put("ambiguous", true);
+            result.put("methodName", ref.hasClassName()
+                    ? ref.className() + "." + ref.methodName() : ref.methodName());
+            result.put("candidates", candidates);
+            result.put("message", "Multiple methods found. Use Class.method(Type1,Type2) to disambiguate.");
+            ctx.formatter().printResult(result);
+            return 0;
         }
 
-        // Check for ambiguity using signatures from index (more reliable than Set size)
-        if (!ref.hasParamTypes()) {
-            String lookupName = ref.hasClassName() ? ref.className() + "." + ref.methodName() : ref.methodName();
-            java.util.Set<String> candidates = new java.util.TreeSet<>();
-            // Scan all signature keys for matches
-            for (var entry : signatures.entrySet()) {
-                String key = entry.getKey();
-                // Match "Class.method/N" or "Class.method"
-                if (ref.hasClassName()) {
-                    if (key.startsWith(ref.className() + "." + ref.methodName())) {
-                        candidates.add(ref.className() + "." + ref.methodName() + entry.getValue());
-                    }
-                } else {
-                    // Match any "*.methodName/N"
-                    if (key.contains("." + ref.methodName() + "/") || key.endsWith("." + ref.methodName())) {
-                        String className = key.substring(0, key.indexOf("." + ref.methodName()));
-                        candidates.add(className + "." + ref.methodName() + entry.getValue());
-                    }
-                }
-            }
-            if (candidates.size() > 1) {
-                Map<String, Object> result = new java.util.LinkedHashMap<>();
-                result.put("ambiguous", true);
-                result.put("methodName", lookupName);
-                result.put("candidates", new java.util.ArrayList<>(candidates));
-                result.put("message", "Multiple methods found. Use Class.method(Type1,Type2) to disambiguate.");
-                ctx.formatter().printResult(result);
-                return 0;
-            }
-        }
+        var targets = resolved.targets();
 
         List<CallChain> chains = new java.util.ArrayList<>();
         java.util.Set<String> seen = new java.util.HashSet<>();
