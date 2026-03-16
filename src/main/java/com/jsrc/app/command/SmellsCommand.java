@@ -60,16 +60,19 @@ public class SmellsCommand implements Command {
     }
 
     private int scanTarget(CommandContext ctx) {
-        // 1. Try direct file/class match first
-        List<Path> directMatches = findFileMatches(ctx.javaFiles(), target);
-        if (!directMatches.isEmpty()) {
-            return scanFiles(ctx, directMatches, null);
+        var ref = MethodResolver.parse(target);
+        boolean isMethodRef = ref.hasParamTypes() || ref.hasClassName();
+
+        // 1. Try direct file/class match first (skip for method refs with parens)
+        if (!isMethodRef) {
+            List<Path> directMatches = findFileMatches(ctx.javaFiles(), target);
+            if (!directMatches.isEmpty()) {
+                return scanFiles(ctx, directMatches, null);
+            }
         }
 
         // 2. Try as method reference via index
         if (ctx.indexed() != null) {
-            var ref = MethodResolver.parse(target);
-
             // Use IndexedCodebase to find methods by name
             var indexedMethods = ctx.indexed().findMethodsByName(ref.methodName());
 
@@ -109,7 +112,11 @@ public class SmellsCommand implements Command {
             }
         }
 
-        System.err.printf("No files matching '%s' found in codebase%n", target);
+        if (ctx.indexed() == null && isMethodRef) {
+            System.err.printf("No index found. Run 'jsrc --index' first to search by method name.%n");
+        } else {
+            System.err.printf("No files matching '%s' found in codebase%n", target);
+        }
         return 0;
     }
 
