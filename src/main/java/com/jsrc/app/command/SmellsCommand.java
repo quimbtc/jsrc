@@ -73,28 +73,21 @@ public class SmellsCommand implements Command {
 
         // 2. Try as method reference via index
         if (ctx.indexed() != null) {
-            // Use IndexedCodebase to find methods by name
-            var indexedMethods = ctx.indexed().findMethodsByName(ref.methodName());
-
-            // Filter by class name if specified
-            if (ref.hasClassName()) {
-                indexedMethods = indexedMethods.stream()
-                        .filter(m -> m.className().equals(ref.className()))
-                        .toList();
-            }
-
-            // Filter by param count if specified
-            if (ref.hasParamTypes()) {
-                int expectedCount = ref.paramTypes().size();
-                indexedMethods = indexedMethods.stream()
-                        .filter(m -> m.parameters().size() == expectedCount)
-                        .toList();
-            }
-
-            // Collect distinct class names
+            // Search index entries directly (IndexedCodebase.findMethodsByName
+            // returns MethodInfo with empty parameters, losing signature data)
             Set<String> matchingClasses = new LinkedHashSet<>();
-            for (var m : indexedMethods) {
-                matchingClasses.add(m.className());
+            for (var entry : ctx.indexed().getEntries()) {
+                for (var ic : entry.classes()) {
+                    for (var im : ic.methods()) {
+                        if (!im.name().equals(ref.methodName())) continue;
+                        if (ref.hasClassName() && !ic.name().equals(ref.className())) continue;
+                        if (ref.hasParamTypes()) {
+                            int paramCount = SignatureUtils.countParams(im.signature());
+                            if (paramCount >= 0 && paramCount != ref.paramTypes().size()) continue;
+                        }
+                        matchingClasses.add(ic.name());
+                    }
+                }
             }
 
             // Check ambiguity: multiple classes, no class specified
