@@ -115,10 +115,17 @@ public class CallChainCommand implements Command {
             }
         }
 
-        // Note: overload filtering by param types is best-effort.
-        // The call graph edges don't carry arg count, so when loading from
-        // index, we can't distinguish which overload each caller invokes.
-        // The ambiguity check ensures the user is aware of overloads.
+        // Filter chains by arg count when specific overload requested
+        if (ref.hasParamTypes()) {
+            int expectedCount = ref.paramTypes().size();
+            chains = chains.stream().filter(chain -> {
+                // Check the last step — the callee is the target method
+                MethodCall lastStep = chain.steps().getLast();
+                int calleeArgs = lastStep.callee().parameterCount();
+                if (calleeArgs >= 0) return calleeArgs == expectedCount;
+                return true; // can't verify, include
+            }).toList();
+        }
 
         ctx.formatter().printCallChains(chains, methodName, signatures);
 

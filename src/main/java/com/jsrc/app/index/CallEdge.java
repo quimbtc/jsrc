@@ -14,5 +14,12 @@ public record CallEdge(
         String callerMethod,
         String calleeClass,
         String calleeMethod,
-        int line
-) {}
+        int line,
+        int argCount
+) {
+    /** Backward-compatible constructor without argCount. */
+    public CallEdge(String callerClass, String callerMethod,
+                    String calleeClass, String calleeMethod, int line) {
+        this(callerClass, callerMethod, calleeClass, calleeMethod, line, -1);
+    }
+}

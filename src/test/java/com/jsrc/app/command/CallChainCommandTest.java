@@ -286,4 +286,79 @@ class CallChainCommandTest {
                 .anyMatch(c -> c.summary().contains("Factory"));
         assertTrue(hasFactory, "Chain should include Factory constructor. Chains: " + chains);
     }
+
+    @Test
+    @DisplayName("Specific overload filters chains by arg count")
+    void overloadFiltersByArgCount() throws Exception {
+        String source = """
+                package com.test;
+                public class Service {
+                    public void process(String s) {
+                        doA();
+                    }
+                    public void process(String s, int count) {
+                        doB();
+                    }
+                    private void doA() {}
+                    private void doB() {}
+                }
+                """;
+        String caller = """
+                package com.test;
+                public class Controller {
+                    private Service svc = new Service();
+                    public void handleOne() {
+                        svc.process("hello");
+                    }
+                    public void handleTwo() {
+                        svc.process("hello", 5);
+                    }
+                }
+                """;
+
+        String output = executeCallChain("Service.process(String,int)", source, caller);
+        Object parsed = JsonReader.parse(output);
+        assertTrue(parsed instanceof List, "Should return chains, got: " + output);
+        @SuppressWarnings("unchecked")
+        var chains = (List<Object>) parsed;
+        assertFalse(chains.isEmpty(), "Should find chains for 2-param overload");
+        // All chains should end at the 2-param process, called by handleTwo
+        assertTrue(output.contains("handleTwo"), "Chain should include handleTwo (calls 2-param process)");
+        assertFalse(output.contains("handleOne"), "Chain should NOT include handleOne (calls 1-param process)");
+    }
+
+    @Test
+    @DisplayName("CallEdge argCount survives index roundtrip")
+    void callEdgeArgCountRoundtrip() throws Exception {
+        String source = """
+                package com.test;
+                public class Svc {
+                    public void a(String x) { b(x, 1); }
+                    public void b(String x, int n) {}
+                }
+                """;
+
+        List<Path> files = new java.util.ArrayList<>();
+        Path f = tempDir.resolve("Svc.java");
+        Files.writeString(f, source);
+        files.add(f);
+
+        var index = new CodebaseIndex();
+        index.build(parser, files, tempDir, List.of());
+        index.save(tempDir);
+
+        // Load and check argCount
+        var loaded = CodebaseIndex.load(tempDir);
+        boolean foundEdgeWithArgCount = false;
+        for (var entry : loaded) {
+            for (var edge : entry.callEdges()) {
+                if (edge.callerMethod().equals("a") && edge.calleeMethod().equals("b")) {
+                    assertEquals(2, edge.argCount(),
+                            "Edge a→b should have argCount=2 (two arguments passed)");
+                    foundEdgeWithArgCount = true;
+                }
+            }
+        }
+        assertTrue(foundEdgeWithArgCount, "Should find edge a→b with argCount");
+    }
 }

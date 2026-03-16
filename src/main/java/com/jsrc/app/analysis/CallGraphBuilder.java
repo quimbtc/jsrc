@@ -108,10 +108,11 @@ public class CallGraphBuilder {
                 }
             }
 
-            // Load call edges
+            // Load call edges — use argCount for callee parameterCount when available
             for (var edge : entry.callEdges()) {
                 MethodReference caller = new MethodReference(edge.callerClass(), edge.callerMethod(), -1, null);
-                MethodReference callee = new MethodReference(edge.calleeClass(), edge.calleeMethod(), -1, null);
+                MethodReference callee = new MethodReference(edge.calleeClass(), edge.calleeMethod(),
+                        edge.argCount(), null);
                 MethodCall call = new MethodCall(caller, callee, edge.line());
 
                 allMethods.add(caller);

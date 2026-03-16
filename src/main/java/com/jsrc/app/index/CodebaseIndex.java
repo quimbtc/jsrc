@@ -193,10 +193,11 @@ public class CodebaseIndex {
                 if (e instanceof Map<?, ?> em) {
                     @SuppressWarnings("unchecked")
                     Map<String, Object> edgeMap = (Map<String, Object>) em;
+                    int argCount = edgeMap.containsKey("argCount") ? intVal(edgeMap, "argCount") : -1;
                     callEdges.add(new CallEdge(
                             str(edgeMap, "callerClass"), str(edgeMap, "callerMethod"),
                             str(edgeMap, "calleeClass"), str(edgeMap, "calleeMethod"),
-                            intVal(edgeMap, "line")));
+                            intVal(edgeMap, "line"), argCount));
                 }
             }
         }
@@ -334,12 +335,14 @@ public class CodebaseIndex {
             String calleeMethod = call.getNameAsString();
             String calleeClass = resolveCalleeClass(call, className, fieldTypes, localTypes);
             int line = call.getBegin().map(p -> p.line).orElse(-1);
-            edges.add(new CallEdge(className, callerMethod, calleeClass, calleeMethod, line));
+            int argCount = call.getArguments().size();
+            edges.add(new CallEdge(className, callerMethod, calleeClass, calleeMethod, line, argCount));
         }
         for (ObjectCreationExpr newExpr : callable.findAll(ObjectCreationExpr.class)) {
             String targetClass = newExpr.getType().getNameAsString();
             int line = newExpr.getBegin().map(p -> p.line).orElse(-1);
-            edges.add(new CallEdge(className, callerMethod, targetClass, targetClass, line));
+            int argCount = newExpr.getArguments().size();
+            edges.add(new CallEdge(className, callerMethod, targetClass, targetClass, line, argCount));
         }
     }
 
@@ -454,6 +457,9 @@ public class CodebaseIndex {
         map.put("calleeClass", edge.calleeClass());
         map.put("calleeMethod", edge.calleeMethod());
         map.put("line", edge.line());
+        if (edge.argCount() >= 0) {
+            map.put("argCount", edge.argCount());
+        }
         return map;
     }
 
