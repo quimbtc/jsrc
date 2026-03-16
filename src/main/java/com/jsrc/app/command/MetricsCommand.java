@@ -37,9 +37,11 @@ public class MetricsCommand implements Command {
         }
 
         // Coupling: count unique dependencies
+        // Use index to find the specific file instead of scanning all files
         int coupling = 0;
         var analyzer = new DependencyAnalyzer();
-        var deps = analyzer.analyze(ctx.javaFiles(), ci.name());
+        java.util.List<java.nio.file.Path> targetFiles = resolveClassFiles(ctx, ci.name());
+        var deps = analyzer.analyze(targetFiles, ci.name());
         if (deps != null) {
             coupling = deps.fieldDependencies().size() + deps.constructorDependencies().size();
         }
@@ -68,5 +70,32 @@ public class MetricsCommand implements Command {
 
         ctx.formatter().printResult(result);
         return 1;
+    }
+
+    /**
+     * Resolves the file(s) containing a class, using the index if available.
+     * Falls back to all files if no index or class not found in index.
+     */
+    private java.util.List<java.nio.file.Path> resolveClassFiles(CommandContext ctx, String className) {
+        if (ctx.indexed() != null) {
+            for (var entry : ctx.indexed().getEntries()) {
+                for (var ic : entry.classes()) {
+                    if (ic.name().equals(className)) {
+                        java.nio.file.Path root = java.nio.file.Path.of(ctx.rootPath());
+                        java.nio.file.Path resolved = root.resolve(entry.path());
+                        // Also check from current dir if rootPath is relative
+                        for (java.nio.file.Path f : ctx.javaFiles()) {
+                            if (f.toString().endsWith(entry.path())) {
+                                return java.util.List.of(f);
+                            }
+                        }
+                        if (java.nio.file.Files.exists(resolved)) {
+                            return java.util.List.of(resolved);
+                        }
+                    }
+                }
+            }
+        }
+        return ctx.javaFiles();
     }
 }
