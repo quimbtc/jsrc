@@ -62,8 +62,10 @@ public class CallChainCommand implements Command {
         var ref = MethodResolver.parse(methodName);
         var resolved = MethodTargetResolver.resolve(ref, graphBuilder);
 
+        var packages = MethodTargetResolver.buildClassPackageMap(ctx.indexed());
+
         if (resolved.isAmbiguous()) {
-            var candidates = MethodTargetResolver.buildCandidates(resolved.targets(), signatures);
+            var candidates = MethodTargetResolver.buildCandidates(resolved.targets(), signatures, packages);
             Map<String, Object> result = new java.util.LinkedHashMap<>();
             result.put("ambiguous", true);
             result.put("methodName", ref.hasClassName()

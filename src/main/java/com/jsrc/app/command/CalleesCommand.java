@@ -32,7 +32,7 @@ public class CalleesCommand implements Command {
         var packages = MethodTargetResolver.buildClassPackageMap(ctx.indexed());
 
         if (resolved.isAmbiguous()) {
-            var candidates = MethodTargetResolver.buildCandidates(resolved.targets(), signatures);
+            var candidates = MethodTargetResolver.buildCandidates(resolved.targets(), signatures, packages);
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("ambiguous", true);
             result.put("methodName", ref.hasClassName()

@@ -229,18 +229,14 @@ public final class MethodTargetResolver {
      */
     public static List<String> buildCandidates(Set<MethodReference> targets,
                                                 java.util.Map<String, String> signatures) {
+        return buildCandidates(targets, signatures, java.util.Map.of());
+    }
+
+    public static List<String> buildCandidates(Set<MethodReference> targets,
+                                                java.util.Map<String, String> signatures,
+                                                java.util.Map<String, String> classPackages) {
         return targets.stream()
-                .map(t -> {
-                    String key = t.className() + "." + t.methodName();
-                    String params = null;
-                    if (t.parameterCount() >= 0) {
-                        params = signatures.get(key + "/" + t.parameterCount());
-                    }
-                    if (params == null) {
-                        params = signatures.getOrDefault(key, "()");
-                    }
-                    return t.className() + "." + t.methodName() + params;
-                })
+                .map(t -> qualifiedDisplayName(t, signatures, classPackages))
                 .sorted()
                 .distinct()
                 .toList();
