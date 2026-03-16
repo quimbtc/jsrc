@@ -106,6 +106,77 @@ class CallChainCommandTest {
     }
 
     @Test
+    @DisplayName("Overloaded methods detected via signature map even with -1 paramCount")
+    void overloadAmbiguityWithFuzzyParamCount() throws Exception {
+        // This test simulates the real-world case where indexed edges have parameterCount=-1
+        String source = """
+                package com.test;
+                public class Service {
+                    public void process(String s) {
+                        System.out.println(s);
+                    }
+                    public void process(String s, int count) {
+                        System.out.println(s + count);
+                    }
+                }
+                """;
+        String caller = """
+                package com.test;
+                public class Controller {
+                    private Service svc = new Service();
+                    public void handleOne() {
+                        svc.process("hello");
+                    }
+                    public void handleTwo() {
+                        svc.process("hello", 5);
+                    }
+                }
+                """;
+
+        // Build index, then load call graph (simulates real flow via loadFromIndex)
+        List<Path> files = new java.util.ArrayList<>();
+        Path f1 = tempDir.resolve("Service.java"); Files.writeString(f1, source); files.add(f1);
+        Path f2 = tempDir.resolve("Controller.java"); Files.writeString(f2, caller); files.add(f2);
+
+        var index = new CodebaseIndex();
+        index.build(parser, files, tempDir, List.of());
+        index.save(tempDir);
+
+        // Inject a -1 paramCount edge (simulates what happens in real codebases)
+        var graphBuilder = new com.jsrc.app.analysis.CallGraphBuilder();
+        graphBuilder.loadFromIndex(index.getEntries());
+        // Manually add an edge with -1 (like runtime InvokerResolver would)
+        graphBuilder.addEdge(new com.jsrc.app.parser.model.MethodCall(
+                new com.jsrc.app.parser.model.MethodReference("External", "call", -1, null),
+                new com.jsrc.app.parser.model.MethodReference("Service", "process", -1, null),
+                999));
+
+        var targets = graphBuilder.findMethodsByName("process");
+        // Even if Set deduplicates, signature map should catch the overloads
+        // This is the real-world scenario: targets may collapse due to fuzzy equals
+
+        // Verify via CallChainCommand output
+        var indexed = IndexedCodebase.tryLoad(tempDir, files);
+        var ctx = new CommandContext(files, tempDir.toString(), null,
+                new JsonFormatter(), indexed, parser);
+
+        var out = new ByteArrayOutputStream();
+        var oldOut = System.out;
+        System.setOut(new PrintStream(out));
+        try {
+            new CallChainCommand("Service.process", tempDir.resolve("chains").toString()).execute(ctx);
+        } finally {
+            System.setOut(oldOut);
+        }
+        String output = out.toString().trim();
+        Object parsed = JsonReader.parse(output);
+        assertTrue(parsed instanceof java.util.Map, "Should return ambiguity map, got: " + output);
+        @SuppressWarnings("unchecked")
+        var map = (java.util.Map<String, Object>) parsed;
+        assertEquals(true, map.get("ambiguous"));
+    }
+
+    @Test
     @DisplayName("Specific overload should not trigger ambiguity")
     void specificOverloadNoAmbiguity() throws Exception {
         String source = """
