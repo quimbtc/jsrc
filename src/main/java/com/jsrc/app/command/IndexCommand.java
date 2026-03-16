@@ -13,8 +13,11 @@ public class IndexCommand implements Command {
         Path root = Paths.get(ctx.rootPath());
         System.err.printf("Indexing %d Java files under '%s'...%n", ctx.javaFiles().size(), ctx.rootPath());
 
-        // Always rebuild from scratch — --index means full re-index
-        var existing = java.util.List.<com.jsrc.app.index.IndexEntry>of();
+        var existing = CodebaseIndex.load(root);
+        // Force re-index entries that lack call edges (from older index versions)
+        existing = existing.stream()
+                .filter(e -> !e.callEdges().isEmpty())
+                .toList();
         var index = new CodebaseIndex();
         var invokers = (ctx.config() != null)
                 ? ctx.config().architecture().invokers()
