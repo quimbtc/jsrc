@@ -268,4 +268,117 @@ class CodebaseIndexTest {
         }
         assertTrue(resolved, "Should resolve field type 'svc' to 'Service'");
     }
+
+    // ---- Field access chain resolution (jsrc-xum) ----
+
+    @Test
+    @DisplayName("TC1: field access on local variable resolves field type")
+    void fieldAccessOnLocalVariable() throws IOException {
+        Path serviceFile = writeFile("Service.java", """
+                public class Service {
+                    public StringBuilder resultado = new StringBuilder();
+                }
+                """);
+        Path callerFile = writeFile("Caller.java", """
+                public class Caller {
+                    public void run() {
+                        Service svc = new Service();
+                        String s = svc.resultado.toString();
+                    }
+                }
+                """);
+
+        var index = new CodebaseIndex();
+        index.build(new HybridJavaParser(), List.of(serviceFile, callerFile), tempDir, List.of());
+
+        boolean found = index.getEntries().stream()
+                .flatMap(e -> e.callEdges().stream())
+                .anyMatch(e -> e.calleeMethod().equals("toString")
+                        && e.calleeClass().equals("StringBuilder"));
+        assertTrue(found, "svc.resultado.toString() should resolve to StringBuilder.toString()");
+    }
+
+    @Test
+    @DisplayName("TC2: field access on this resolves to field type")
+    void fieldAccessOnThis() throws IOException {
+        Path file = writeFile("Service.java", """
+                public class Service {
+                    public StringBuilder buffer = new StringBuilder();
+                    public void run() {
+                        String s = this.buffer.toString();
+                    }
+                }
+                """);
+
+        var index = new CodebaseIndex();
+        index.build(new HybridJavaParser(), List.of(file), tempDir, List.of());
+
+        boolean found = index.getEntries().stream()
+                .flatMap(e -> e.callEdges().stream())
+                .anyMatch(e -> e.callerMethod().equals("run")
+                        && e.calleeMethod().equals("toString")
+                        && e.calleeClass().equals("StringBuilder"));
+        assertTrue(found, "this.buffer.toString() should resolve to StringBuilder.toString()");
+    }
+
+    @Test
+    @DisplayName("TC3: chained field + method call resolves field type")
+    void chainedFieldAndMethod() throws IOException {
+        Path orderFile = writeFile("Order.java", """
+                public class Order {
+                    public Customer customer = new Customer();
+                }
+                """);
+        Path customerFile = writeFile("Customer.java", """
+                public class Customer {
+                    public Address getAddress() { return null; }
+                }
+                """);
+        Path processorFile = writeFile("Processor.java", """
+                public class Processor {
+                    public void process(Order order) {
+                        order.customer.getAddress();
+                    }
+                }
+                """);
+
+        var index = new CodebaseIndex();
+        index.build(new HybridJavaParser(),
+                List.of(orderFile, customerFile, processorFile), tempDir, List.of());
+
+        boolean found = index.getEntries().stream()
+                .flatMap(e -> e.callEdges().stream())
+                .anyMatch(e -> e.callerClass().equals("Processor")
+                        && e.calleeMethod().equals("getAddress")
+                        && e.calleeClass().equals("Customer"));
+        assertTrue(found, "order.customer.getAddress() should resolve to Customer.getAddress()");
+    }
+
+    @Test
+    @DisplayName("IndexedClass stores field types and survives roundtrip")
+    void indexedFieldRoundtrip() throws IOException {
+        Path file = writeFile("WithFields.java", """
+                public class WithFields {
+                    private String name;
+                    public int count;
+                    public void noop() {}
+                }
+                """);
+
+        var index = new CodebaseIndex();
+        index.build(new HybridJavaParser(), List.of(file), tempDir, List.of());
+        index.save(tempDir);
+
+        List<IndexEntry> loaded = CodebaseIndex.load(tempDir);
+        IndexedClass ic = loaded.getFirst().classes().getFirst();
+        assertNotNull(ic.fields(), "fields should not be null");
+        assertEquals(2, ic.fields().size(), "Should have 2 fields");
+
+        boolean hasName = ic.fields().stream()
+                .anyMatch(f -> f.name().equals("name") && f.type().equals("String"));
+        boolean hasCount = ic.fields().stream()
+                .anyMatch(f -> f.name().equals("count") && f.type().equals("int"));
+        assertTrue(hasName, "Should have field name:String");
+        assertTrue(hasCount, "Should have field count:int");
+    }
 }

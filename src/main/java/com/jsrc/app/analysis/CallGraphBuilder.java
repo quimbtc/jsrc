@@ -22,6 +22,8 @@ import com.github.javaparser.ast.body.ConstructorDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.Parameter;
 import com.github.javaparser.ast.body.VariableDeclarator;
+import com.github.javaparser.ast.expr.Expression;
+import com.github.javaparser.ast.expr.FieldAccessExpr;
 import com.github.javaparser.ast.expr.MethodCallExpr;
 import com.github.javaparser.ast.expr.NameExpr;
 import com.github.javaparser.ast.expr.ObjectCreationExpr;
@@ -138,6 +140,8 @@ public class CallGraphBuilder {
      * that produces the receiver. Runs iteratively to handle chained calls like
      * {@code fto.getExplotacion().getIdiomaDefecto().getIdioma()}.
      * <p>
+     * Also resolves "?field:OwnerType.fieldName" markers from field access chains.
+     * <p>
      * Pass 1: resolves ?.getIdiomaDefecto() → Explotacion.getIdiomaDefecto()
      * (because getExplotacion() returns Explotacion and is on the same line).
      * Pass 2: resolves ?.getIdioma() → IdiomaDefecto.getIdioma()
@@ -153,9 +157,20 @@ public class CallGraphBuilder {
             }
         }
 
+        // Build field type map: "ClassName.fieldName" → field type (simple name)
+        Map<String, String> fieldTypeMap = new HashMap<>();
+        for (var entry : entries) {
+            for (var ic : entry.classes()) {
+                for (var f : ic.fields()) {
+                    fieldTypeMap.put(ic.name() + "." + f.name(), f.type());
+                }
+            }
+        }
+
+        // Resolve ?field: markers before return-type resolution
+        resolveFieldMarkers(fieldTypeMap);
+
         // Build return type map: "ClassName.methodName" → resolved simple return type
-        // Uses imports of the declaring class to disambiguate when multiple classes
-        // share the same simple name (e.g. Explotacion in different packages)
         Map<String, String> returnTypes = new HashMap<>();
         for (var entry : entries) {
             for (var ic : entry.classes()) {
@@ -166,7 +181,6 @@ public class CallGraphBuilder {
                         int genIdx = rt.indexOf('<');
                         if (genIdx > 0) rt = rt.substring(0, genIdx);
 
-                        // Resolve return type using imports of the declaring class
                         String resolved = resolveTypeViaImports(rt, ic.imports(), ic.packageName(), simpleToQualified);
                         returnTypes.put(ic.name() + "." + im.name(), resolved);
                     }
@@ -182,6 +196,106 @@ public class CallGraphBuilder {
             if (!changed) break;
             logger.debug("Return type resolution pass {} completed", pass + 1);
         }
+    }
+
+    /**
+     * Resolves "?field:" and "?ret:" callee class markers.
+     * These are produced by CodebaseIndex when a method is called on a field access
+     * or method return expression.
+     * <p>
+     * Example: {@code svc.resultado.toString()} → callee "?field:Service.resultado"
+     * → looks up Service.resultado = StringBuilder → resolves to StringBuilder.toString()
+     * <p>
+     * Runs iteratively to handle nested field/return type chains.
+     */
+    private void resolveFieldMarkers(Map<String, String> fieldTypeMap) {
+        // Also build return type map from allMethods + calleeIndex
+        Map<String, String> returnTypeMap = new HashMap<>();
+        // returnTypeMap is populated externally; here we only have fieldTypeMap.
+        // ?ret: markers that remain will be resolved in the main resolvePass.
+
+        for (int pass = 0; pass < 5; pass++) {
+            boolean changed = false;
+            Map<MethodReference, Set<MethodCall>> newCalleeIndex = new HashMap<>();
+
+            for (var callerEntry : calleeIndex.entrySet()) {
+                MethodReference caller = callerEntry.getKey();
+                Set<MethodCall> calls = callerEntry.getValue();
+                Set<MethodCall> updatedCalls = new HashSet<>();
+
+                for (MethodCall call : calls) {
+                    String calleeClass = call.callee().className();
+                    if (calleeClass.startsWith("?field:")) {
+                        String resolved = resolveMarkerChain(calleeClass, fieldTypeMap, returnTypeMap);
+                        if (resolved != null && !resolved.startsWith("?")) {
+                            MethodReference newCallee = new MethodReference(
+                                    resolved, call.callee().methodName(),
+                                    call.callee().parameterCount(), null);
+                            MethodCall newCall = new MethodCall(caller, newCallee, call.line());
+                            updatedCalls.add(newCall);
+
+                            callerIndex.getOrDefault(call.callee(), Collections.emptySet()).remove(call);
+                            callerIndex.computeIfAbsent(newCallee, k -> new HashSet<>()).add(newCall);
+                            allMethods.add(newCallee);
+                            methodsByName.computeIfAbsent(newCallee.methodName(), k -> new HashSet<>()).add(newCallee);
+                            changed = true;
+                            continue;
+                        }
+                    }
+                    updatedCalls.add(call);
+                }
+                newCalleeIndex.put(caller, updatedCalls);
+            }
+
+            if (changed) {
+                calleeIndex.clear();
+                calleeIndex.putAll(newCalleeIndex);
+                callerIndex.entrySet().removeIf(e -> e.getValue().isEmpty());
+            } else {
+                break;
+            }
+        }
+    }
+
+    /**
+     * Resolves a marker chain ("?field:" or "?ret:") to a concrete type.
+     */
+    private String resolveMarkerChain(String marker,
+                                       Map<String, String> fieldTypeMap,
+                                       Map<String, String> returnTypeMap) {
+        if (marker.startsWith("?field:")) {
+            String payload = marker.substring("?field:".length());
+            int dotIdx = payload.lastIndexOf('.');
+            if (dotIdx < 0) return null;
+
+            String ownerType = payload.substring(0, dotIdx);
+            String fieldName = payload.substring(dotIdx + 1);
+
+            if (ownerType.startsWith("?")) {
+                ownerType = resolveMarkerChain(ownerType, fieldTypeMap, returnTypeMap);
+                if (ownerType == null || ownerType.startsWith("?")) return null;
+            }
+
+            return fieldTypeMap.get(ownerType + "." + fieldName);
+        }
+
+        if (marker.startsWith("?ret:")) {
+            String payload = marker.substring("?ret:".length());
+            int dotIdx = payload.lastIndexOf('.');
+            if (dotIdx < 0) return null;
+
+            String ownerType = payload.substring(0, dotIdx);
+            String methodName = payload.substring(dotIdx + 1);
+
+            if (ownerType.startsWith("?")) {
+                ownerType = resolveMarkerChain(ownerType, fieldTypeMap, returnTypeMap);
+                if (ownerType == null || ownerType.startsWith("?")) return null;
+            }
+
+            return returnTypeMap.get(ownerType + "." + methodName);
+        }
+
+        return marker;
     }
 
     /**
@@ -549,7 +663,66 @@ public class CallGraphBuilder {
             }
         }
 
+        if (scope instanceof FieldAccessExpr fae) {
+            String resolvedType = resolveFieldAccessType(fae, currentClass, localTypes, classCtx, allClasses);
+            if (resolvedType != null) {
+                Path targetFile = allClasses.containsKey(resolvedType)
+                        ? allClasses.get(resolvedType).filePath : null;
+                return new MethodReference(resolvedType, methodName, argCount, targetFile);
+            }
+        }
+
         return MethodReference.unresolved(methodName, argCount);
+    }
+
+    /**
+     * Resolves the type of a field access expression like {@code obj.field}.
+     * Determines the type of {@code obj}, then looks up the field type in that class's context.
+     */
+    private String resolveFieldAccessType(FieldAccessExpr fae, String currentClass,
+                                           Map<String, String> localTypes,
+                                           ClassContext classCtx,
+                                           Map<String, ClassContext> allClasses) {
+        String fieldName = fae.getNameAsString();
+        Expression objExpr = fae.getScope();
+
+        String objType = resolveExpressionType(objExpr, currentClass, localTypes, classCtx, allClasses);
+        if (objType == null) return null;
+
+        // Look up the field type in the resolved class
+        ClassContext ownerCtx = allClasses.get(objType);
+        if (ownerCtx != null) {
+            String fieldType = ownerCtx.fieldTypes.get(fieldName);
+            if (fieldType != null) return stripGenerics(fieldType);
+        }
+        return null;
+    }
+
+    /**
+     * Resolves the type of an arbitrary expression: variable, this, field access chain.
+     */
+    private String resolveExpressionType(Expression expr, String currentClass,
+                                          Map<String, String> localTypes,
+                                          ClassContext classCtx,
+                                          Map<String, ClassContext> allClasses) {
+        if (expr instanceof ThisExpr) return currentClass;
+        if (expr instanceof NameExpr ne) {
+            String varName = ne.getNameAsString();
+            String resolved = resolveVariableType(varName, localTypes, classCtx, allClasses);
+            if (resolved != null) return resolved;
+            if (allClasses.containsKey(varName)) return varName;
+            return null;
+        }
+        if (expr instanceof FieldAccessExpr fae) {
+            return resolveFieldAccessType(fae, currentClass, localTypes, classCtx, allClasses);
+        }
+        if (expr instanceof MethodCallExpr mce) {
+            // For method().field.method() chains: resolve receiver, then lookup return type
+            // This requires return type info which we don't have in build() pass
+            // Return null — will be resolved in post-processing
+            return null;
+        }
+        return null;
     }
 
     private String resolveVariableType(String varName, Map<String, String> localTypes,

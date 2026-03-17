@@ -16,6 +16,7 @@ import java.util.List;
  * @param methods       method signatures indexed
  * @param annotations   annotation names on the class
  * @param imports       import statements in the file
+ * @param fields        field name → type pairs for call graph resolution
  */
 public record IndexedClass(
         String name,
@@ -28,8 +29,20 @@ public record IndexedClass(
         List<String> interfaces,
         List<IndexedMethod> methods,
         List<String> annotations,
-        List<String> imports
+        List<String> imports,
+        List<IndexedField> fields
 ) {
+    /** Backward-compatible constructor without fields. */
+    public IndexedClass(
+            String name, String packageName, int startLine, int endLine,
+            boolean isInterface, boolean isAbstract,
+            List<String> superClass, List<String> interfaces,
+            List<IndexedMethod> methods, List<String> annotations,
+            List<String> imports) {
+        this(name, packageName, startLine, endLine, isInterface, isAbstract,
+                superClass, interfaces, methods, annotations, imports, List.of());
+    }
+
     public String qualifiedName() {
         return packageName.isEmpty() ? name : packageName + "." + name;
     }

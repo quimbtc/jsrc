@@ -24,6 +24,7 @@ import com.github.javaparser.JavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
+import com.github.javaparser.ast.expr.FieldAccessExpr;
 import com.github.javaparser.ast.expr.MethodCallExpr;
 import com.github.javaparser.ast.expr.NameExpr;
 import com.github.javaparser.ast.expr.ObjectCreationExpr;
@@ -119,7 +120,113 @@ public class CodebaseIndex {
             }
         }
 
+        // Post-build: resolve ?field: markers using cross-class field type map
+        resolveFieldMarkersInEntries();
+
         return reindexed;
+    }
+
+    /**
+     * Resolves "?field:" and "?ret:" callee class markers in all index entries.
+     * Uses field type and return type information from all indexed classes.
+     */
+    private void resolveFieldMarkersInEntries() {
+        // Build field type map: "ClassName.fieldName" → type
+        Map<String, String> fieldTypeMap = new HashMap<>();
+        // Build return type map: "ClassName.methodName" → return type
+        Map<String, String> returnTypeMap = new HashMap<>();
+        for (IndexEntry entry : entries) {
+            for (IndexedClass ic : entry.classes()) {
+                for (IndexedField f : ic.fields()) {
+                    fieldTypeMap.put(ic.name() + "." + f.name(), f.type());
+                }
+                for (IndexedMethod im : ic.methods()) {
+                    if (im.returnType() != null && !im.returnType().isEmpty()
+                            && !"void".equals(im.returnType())) {
+                        String rt = im.returnType();
+                        int genIdx = rt.indexOf('<');
+                        if (genIdx > 0) rt = rt.substring(0, genIdx);
+                        returnTypeMap.put(ic.name() + "." + im.name(), rt);
+                    }
+                }
+            }
+        }
+        if (fieldTypeMap.isEmpty() && returnTypeMap.isEmpty()) return;
+
+        // Resolve markers iteratively (nested field/return type chains)
+        for (int pass = 0; pass < 5; pass++) {
+            boolean changed = false;
+            List<IndexEntry> newEntries = new ArrayList<>();
+            for (IndexEntry entry : entries) {
+                List<CallEdge> newEdges = new ArrayList<>();
+                boolean entryChanged = false;
+                for (CallEdge edge : entry.callEdges()) {
+                    if (edge.calleeClass().startsWith("?field:") || edge.calleeClass().startsWith("?ret:")) {
+                        String resolved = resolveMarker(edge.calleeClass(), fieldTypeMap, returnTypeMap);
+                        if (resolved != null && !resolved.startsWith("?")) {
+                            newEdges.add(new CallEdge(edge.callerClass(), edge.callerMethod(),
+                                    edge.callerParamCount(), resolved, edge.calleeMethod(),
+                                    edge.line(), edge.argCount()));
+                            entryChanged = true;
+                            changed = true;
+                            continue;
+                        }
+                    }
+                    newEdges.add(edge);
+                }
+                newEntries.add(entryChanged
+                        ? new IndexEntry(entry.path(), entry.contentHash(), entry.lastModified(),
+                                entry.classes(), newEdges)
+                        : entry);
+            }
+            entries.clear();
+            entries.addAll(newEntries);
+            if (!changed) break;
+        }
+    }
+
+    /**
+     * Resolves a marker string to a concrete type.
+     * Supports "?field:OwnerType.fieldName" and "?ret:ClassName.methodName".
+     */
+    private static String resolveMarker(String marker,
+                                         Map<String, String> fieldTypeMap,
+                                         Map<String, String> returnTypeMap) {
+        if (marker.startsWith("?field:")) {
+            String payload = marker.substring("?field:".length());
+            int dotIdx = payload.lastIndexOf('.');
+            if (dotIdx < 0) return null;
+
+            String ownerType = payload.substring(0, dotIdx);
+            String fieldName = payload.substring(dotIdx + 1);
+
+            // If owner is itself a marker, resolve recursively
+            if (ownerType.startsWith("?")) {
+                ownerType = resolveMarker(ownerType, fieldTypeMap, returnTypeMap);
+                if (ownerType == null || ownerType.startsWith("?")) return null;
+            }
+
+            return fieldTypeMap.get(ownerType + "." + fieldName);
+        }
+
+        if (marker.startsWith("?ret:")) {
+            String payload = marker.substring("?ret:".length());
+            int dotIdx = payload.lastIndexOf('.');
+            if (dotIdx < 0) return null;
+
+            String ownerType = payload.substring(0, dotIdx);
+            String methodName = payload.substring(dotIdx + 1);
+
+            // If owner is itself a marker, resolve recursively
+            if (ownerType.startsWith("?")) {
+                ownerType = resolveMarker(ownerType, fieldTypeMap, returnTypeMap);
+                if (ownerType == null || ownerType.startsWith("?")) return null;
+            }
+
+            return returnTypeMap.get(ownerType + "." + methodName);
+        }
+
+        return marker;
     }
 
     /**
@@ -233,9 +340,21 @@ public class CodebaseIndex {
             }
         }
 
+        List<IndexedField> fields = new ArrayList<>();
+        Object fieldsRaw = map.get("fields");
+        if (fieldsRaw instanceof List<?> fl) {
+            for (Object f : fl) {
+                if (f instanceof Map<?, ?> fm) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> fieldMap = (Map<String, Object>) fm;
+                    fields.add(new IndexedField(str(fieldMap, "name"), str(fieldMap, "type")));
+                }
+            }
+        }
+
         return new IndexedClass(name, pkg, startLine, endLine,
                 isInterface, isAbstract, superClass, interfaces,
-                methods, annotations, imports);
+                methods, annotations, imports, fields);
     }
 
     @SuppressWarnings("unchecked")
@@ -357,7 +476,8 @@ public class CodebaseIndex {
 
     /**
      * Resolves the class of the callee in a method call expression.
-     * Checks: this → current class, variable → local/param/field type, static → class name.
+     * Checks: this → current class, variable → local/param/field type,
+     * FieldAccessExpr → field type lookup, static → class name.
      */
     private static String resolveCalleeClass(MethodCallExpr call, String currentClass,
                                               Map<String, String> fieldTypes,
@@ -375,7 +495,61 @@ public class CodebaseIndex {
             // Could be a static call on a class name
             return varName;
         }
+        if (scope instanceof FieldAccessExpr fae) {
+            // Resolve: obj.field.method() → resolve obj type, then look up field type
+            String fieldName = fae.getNameAsString();
+            var objExpr = fae.getScope();
+
+            // Determine the type of the object expression
+            String objType = resolveExpressionType(objExpr, currentClass, fieldTypes, localTypes);
+            if (objType != null) {
+                // Encode as marker for post-load cross-class resolution
+                return "?field:" + objType + "." + fieldName;
+            }
+        }
         return "?";
+    }
+
+    /**
+     * Resolves the type of an expression (variable, this, field access, method call).
+     * Used to determine the owner class of a field access.
+     * <p>
+     * For method calls without known return type, encodes as "?ret:ClassName.methodName"
+     * to be resolved later using the return type map.
+     */
+    private static String resolveExpressionType(com.github.javaparser.ast.expr.Expression expr,
+                                                 String currentClass,
+                                                 Map<String, String> fieldTypes,
+                                                 Map<String, String> localTypes) {
+        if (expr instanceof ThisExpr) return currentClass;
+        if (expr instanceof NameExpr ne) {
+            String varName = ne.getNameAsString();
+            String type = localTypes.get(varName);
+            if (type != null) return type;
+            type = fieldTypes.get(varName);
+            if (type != null) return type;
+            // Could be a class name (static field access)
+            return varName;
+        }
+        if (expr instanceof FieldAccessExpr fae) {
+            String objType = resolveExpressionType(fae.getScope(), currentClass, fieldTypes, localTypes);
+            if (objType != null) {
+                return "?field:" + objType + "." + fae.getNameAsString();
+            }
+        }
+        if (expr instanceof com.github.javaparser.ast.expr.MethodCallExpr mce) {
+            // Encode as "?ret:ClassName.methodName" for later return type resolution
+            String methodName = mce.getNameAsString();
+            if (mce.getScope().isEmpty()) {
+                return "?ret:" + currentClass + "." + methodName;
+            }
+            // For chained method calls: resolve scope type first
+            String scopeType = resolveExpressionType(mce.getScope().get(), currentClass, fieldTypes, localTypes);
+            if (scopeType != null) {
+                return "?ret:" + scopeType + "." + methodName;
+            }
+        }
+        return null;
     }
 
     /**
@@ -441,11 +615,42 @@ public class CodebaseIndex {
         List<String> annotations = ci.annotations().stream()
                 .map(a -> a.name()).toList();
 
+        // Extract field types from the source file using JavaParser
+        List<IndexedField> fields = extractFields(file, ci.name());
+
         return new IndexedClass(
                 ci.name(), ci.packageName(), ci.startLine(), ci.endLine(),
                 ci.isInterface(), ci.isAbstract(),
                 ci.superClass().isEmpty() ? List.of() : List.of(ci.superClass()),
-                ci.interfaces(), methods, annotations, fileImports);
+                ci.interfaces(), methods, annotations, fileImports, fields);
+    }
+
+    /**
+     * Extracts field declarations from a class in the given file.
+     */
+    private List<IndexedField> extractFields(Path file, String className) {
+        List<IndexedField> fields = new ArrayList<>();
+        try {
+            String source = java.nio.file.Files.readString(file);
+            var jp = new JavaParser();
+            var result = jp.parse(source);
+            if (!result.getResult().isPresent()) return fields;
+            for (ClassOrInterfaceDeclaration cid : result.getResult().get()
+                    .findAll(ClassOrInterfaceDeclaration.class)) {
+                if (!cid.getNameAsString().equals(className)) continue;
+                for (com.github.javaparser.ast.body.FieldDeclaration fd : cid.getFields()) {
+                    String fieldType = fd.getCommonType().asString();
+                    int genIdx = fieldType.indexOf('<');
+                    if (genIdx > 0) fieldType = fieldType.substring(0, genIdx);
+                    for (com.github.javaparser.ast.body.VariableDeclarator var : fd.getVariables()) {
+                        fields.add(new IndexedField(var.getNameAsString(), fieldType));
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            logger.debug("Error extracting fields from {}: {}", file, ex.getMessage());
+        }
+        return fields;
     }
 
     /**
@@ -508,6 +713,16 @@ public class CodebaseIndex {
         if (!ic.imports().isEmpty()) {
             map.put("imports", ic.imports());
         }
+        if (!ic.fields().isEmpty()) {
+            map.put("fields", ic.fields().stream().map(this::fieldToMap).toList());
+        }
+        return map;
+    }
+
+    private Map<String, Object> fieldToMap(IndexedField f) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("name", f.name());
+        map.put("type", f.type());
         return map;
     }
 

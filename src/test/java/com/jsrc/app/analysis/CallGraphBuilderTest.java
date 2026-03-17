@@ -421,6 +421,172 @@ class CallGraphBuilderTest {
         assertTrue(call2HasOther, "call(String,int) should call other()");
     }
 
+    // ---- Field access chain resolution (jsrc-xum) ----
+
+    @Test
+    @DisplayName("TC1: build resolves field access on local variable")
+    void fieldAccessOnLocalVariable() throws IOException {
+        Path serviceFile = writeFile("Service.java", """
+                public class Service {
+                    public StringBuilder resultado = new StringBuilder();
+                }
+                """);
+        Path callerFile = writeFile("Caller.java", """
+                public class Caller {
+                    public void run() {
+                        Service svc = new Service();
+                        String s = svc.resultado.toString();
+                    }
+                }
+                """);
+
+        builder.build(List.of(serviceFile, callerFile));
+
+        MethodReference run = new MethodReference("Caller", "run", 0, callerFile);
+        Set<MethodCall> callees = builder.getCalleesOf(run);
+        assertTrue(callees.stream().anyMatch(c ->
+                c.callee().methodName().equals("toString")
+                        && c.callee().className().equals("StringBuilder")),
+                "svc.resultado.toString() should resolve to StringBuilder.toString()");
+    }
+
+    @Test
+    @DisplayName("TC2: build resolves field access on this")
+    void fieldAccessOnThis() throws IOException {
+        Path file = writeFile("Service.java", """
+                public class Service {
+                    public StringBuilder buffer = new StringBuilder();
+                    public void run() {
+                        String s = this.buffer.toString();
+                    }
+                }
+                """);
+
+        builder.build(List.of(file));
+
+        MethodReference run = new MethodReference("Service", "run", 0, file);
+        Set<MethodCall> callees = builder.getCalleesOf(run);
+        assertTrue(callees.stream().anyMatch(c ->
+                c.callee().methodName().equals("toString")
+                        && c.callee().className().equals("StringBuilder")),
+                "this.buffer.toString() should resolve to StringBuilder.toString()");
+    }
+
+    @Test
+    @DisplayName("TC3: build resolves chained field + method")
+    void chainedFieldAndMethod() throws IOException {
+        Path orderFile = writeFile("Order.java", """
+                public class Order {
+                    public Customer customer = new Customer();
+                }
+                """);
+        Path customerFile = writeFile("Customer.java", """
+                public class Customer {
+                    public Address getAddress() { return null; }
+                }
+                """);
+        Path processorFile = writeFile("Processor.java", """
+                public class Processor {
+                    public void process(Order order) {
+                        order.customer.getAddress();
+                    }
+                }
+                """);
+
+        builder.build(List.of(orderFile, customerFile, processorFile));
+
+        MethodReference process = new MethodReference("Processor", "process", 1, processorFile);
+        Set<MethodCall> callees = builder.getCalleesOf(process);
+        assertTrue(callees.stream().anyMatch(c ->
+                c.callee().methodName().equals("getAddress")
+                        && c.callee().className().equals("Customer")),
+                "order.customer.getAddress() should resolve to Customer.getAddress()");
+    }
+
+    @Test
+    @DisplayName("TC5: loadFromIndex resolves hybrid chain (method return + field + field)")
+    void hybridChainMethodReturnAndFields() throws IOException {
+        Path factoryFile = writeFile("Factory.java", """
+                public class Factory {
+                    public Service service = new Service();
+                    public Factory() {}
+                }
+                """);
+        Path serviceFile = writeFile("Service.java", """
+                public class Service {
+                    public StringBuilder buffer = new StringBuilder();
+                    public Service() {}
+                }
+                """);
+        Path callerFile = writeFile("Caller.java", """
+                public class Caller {
+                    public Factory getFactory() { return null; }
+                    public void run() {
+                        getFactory().service.buffer.toString();
+                    }
+                }
+                """);
+
+        // TC5 requires return type + field type + field type resolution — only available via index
+        var index = new com.jsrc.app.index.CodebaseIndex();
+        index.build(new com.jsrc.app.parser.HybridJavaParser(),
+                List.of(factoryFile, serviceFile, callerFile), tempDir, List.of());
+
+        var loaded = new CallGraphBuilder();
+        loaded.loadFromIndex(index.getEntries());
+
+        Set<MethodReference> runs = loaded.findMethodsByName("run");
+        boolean found = false;
+        for (MethodReference run : runs) {
+            if (!"Caller".equals(run.className())) continue;
+            for (MethodCall c : loaded.getCalleesOf(run)) {
+                if (c.callee().methodName().equals("toString")
+                        && c.callee().className().equals("StringBuilder")) {
+                    found = true;
+                }
+            }
+        }
+        assertTrue(found, "getFactory().service.buffer.toString() should resolve to StringBuilder.toString()");
+    }
+
+    @Test
+    @DisplayName("TC1-index: loadFromIndex resolves field access via field type map")
+    void fieldAccessOnLocalVariableViaIndex() throws IOException {
+        Path serviceFile = writeFile("Service.java", """
+                public class Service {
+                    public StringBuilder resultado = new StringBuilder();
+                }
+                """);
+        Path callerFile = writeFile("Caller.java", """
+                public class Caller {
+                    public void run() {
+                        Service svc = new Service();
+                        String s = svc.resultado.toString();
+                    }
+                }
+                """);
+
+        var index = new com.jsrc.app.index.CodebaseIndex();
+        index.build(new com.jsrc.app.parser.HybridJavaParser(),
+                List.of(serviceFile, callerFile), tempDir, List.of());
+
+        var loaded = new CallGraphBuilder();
+        loaded.loadFromIndex(index.getEntries());
+
+        Set<MethodReference> runs = loaded.findMethodsByName("run");
+        boolean found = false;
+        for (MethodReference run : runs) {
+            if (!"Caller".equals(run.className())) continue;
+            for (MethodCall c : loaded.getCalleesOf(run)) {
+                if (c.callee().methodName().equals("toString")
+                        && c.callee().className().equals("StringBuilder")) {
+                    found = true;
+                }
+            }
+        }
+        assertTrue(found, "loadFromIndex should resolve svc.resultado.toString() to StringBuilder.toString()");
+    }
+
     private Path writeFile(String name, String content) throws IOException {
         Path file = tempDir.resolve(name);
         Files.writeString(file, content);
