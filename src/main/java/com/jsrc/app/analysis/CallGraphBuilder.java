@@ -144,7 +144,18 @@ public class CallGraphBuilder {
      * (because getIdiomaDefecto() was resolved in pass 1 and returns IdiomaDefecto).
      */
     private void resolveUnknownCallees(List<com.jsrc.app.index.IndexEntry> entries) {
-        // Build return type map: "ClassName.methodName" → simple return type
+        // Build class name → qualified name map (for all indexed classes)
+        Map<String, Set<String>> simpleToQualified = new HashMap<>();
+        for (var entry : entries) {
+            for (var ic : entry.classes()) {
+                simpleToQualified.computeIfAbsent(ic.name(), k -> new HashSet<>())
+                        .add(ic.qualifiedName());
+            }
+        }
+
+        // Build return type map: "ClassName.methodName" → resolved simple return type
+        // Uses imports of the declaring class to disambiguate when multiple classes
+        // share the same simple name (e.g. Explotacion in different packages)
         Map<String, String> returnTypes = new HashMap<>();
         for (var entry : entries) {
             for (var ic : entry.classes()) {
@@ -154,7 +165,10 @@ public class CallGraphBuilder {
                         String rt = im.returnType();
                         int genIdx = rt.indexOf('<');
                         if (genIdx > 0) rt = rt.substring(0, genIdx);
-                        returnTypes.put(ic.name() + "." + im.name(), rt);
+
+                        // Resolve return type using imports of the declaring class
+                        String resolved = resolveTypeViaImports(rt, ic.imports(), ic.packageName(), simpleToQualified);
+                        returnTypes.put(ic.name() + "." + im.name(), resolved);
                     }
                 }
             }
@@ -164,7 +178,7 @@ public class CallGraphBuilder {
 
         // Iterate until no more resolutions (handles chained calls)
         for (int pass = 0; pass < 5; pass++) {
-            boolean changed = resolvePass(returnTypes);
+            boolean changed = resolvePass(returnTypes, simpleToQualified);
             if (!changed) break;
             logger.debug("Return type resolution pass {} completed", pass + 1);
         }
@@ -174,7 +188,8 @@ public class CallGraphBuilder {
      * Single pass of unknown callee resolution.
      * Returns true if any callees were resolved.
      */
-    private boolean resolvePass(Map<String, String> returnTypes) {
+    private boolean resolvePass(Map<String, String> returnTypes,
+                                Map<String, Set<String>> qualifiedNames) {
         Map<MethodReference, Set<MethodCall>> newCalleeIndex = new HashMap<>();
         boolean changed = false;
 
@@ -197,7 +212,7 @@ public class CallGraphBuilder {
                     continue;
                 }
 
-                String resolvedClass = resolveCalleeClass(call, resolvedByLine, returnTypes);
+                String resolvedClass = resolveCalleeClass(call, resolvedByLine, returnTypes, qualifiedNames);
 
                 if (resolvedClass != null) {
                     MethodReference newCallee = new MethodReference(
@@ -232,21 +247,46 @@ public class CallGraphBuilder {
     /**
      * Tries to resolve a "?" callee class using return types of other calls on the same line,
      * or by unique method name match across the codebase.
+     * <p>
+     * When the return type is a qualified name (e.g. "com.app.Explotacion"), uses it
+     * to disambiguate classes with the same simple name in different packages.
+     *
+     * @param qualifiedNames map of simple class name → set of qualified names (for disambiguation)
      */
     private String resolveCalleeClass(MethodCall call,
                                        Map<Integer, List<MethodCall>> resolvedByLine,
-                                       Map<String, String> returnTypes) {
+                                       Map<String, String> returnTypes,
+                                       Map<String, Set<String>> qualifiedNames) {
         // Strategy 1: same-line calls whose return type declares this method
         List<MethodCall> sameLine = resolvedByLine.getOrDefault(call.line(), List.of());
         for (MethodCall resolved : sameLine) {
             String rt = returnTypes.get(resolved.callee().className() + "." + resolved.callee().methodName());
             if (rt != null) {
-                // Check if the return type class actually has this method
-                String candidateKey = rt + "." + call.callee().methodName();
-                if (returnTypes.containsKey(candidateKey)
-                        || methodsByName.getOrDefault(call.callee().methodName(), Set.of())
-                                .stream().anyMatch(m -> m.className().equals(rt))) {
-                    return rt;
+                String simpleRt = rt.contains(".") ? rt.substring(rt.lastIndexOf('.') + 1) : rt;
+
+                // Verify the return type class has the target method
+                Set<MethodReference> candidates = methodsByName.getOrDefault(call.callee().methodName(), Set.of());
+                boolean hasMethod = candidates.stream()
+                        .anyMatch(m -> m.className().equals(simpleRt));
+                if (!hasMethod) continue;
+
+                // If multiple classes share the simple name, use the qualified return type
+                // to pick the correct one by checking which class has this method in returnTypes
+                Set<String> qualifieds = qualifiedNames.getOrDefault(simpleRt, Set.of());
+                if (qualifieds.size() > 1 && rt.contains(".")) {
+                    // The return type map keys use simple names. Check if the method exists
+                    // specifically under a class with the correct qualified name by verifying
+                    // returnTypes contains an entry for this class.method
+                    String checkKey = simpleRt + "." + call.callee().methodName();
+                    String methodReturnType = returnTypes.get(checkKey);
+                    if (methodReturnType != null || hasMethod) {
+                        // Accept only if the qualified RT is among known qualifieds
+                        if (qualifieds.contains(rt)) {
+                            return simpleRt;
+                        }
+                    }
+                } else {
+                    return simpleRt;
                 }
             }
         }
@@ -264,6 +304,58 @@ public class CallGraphBuilder {
         }
 
         return null;
+    }
+
+    /**
+     * Resolves a simple return type name to a qualified name using the declaring
+     * class's imports. E.g. "Explotacion" → "com.agbar.occam.negocio.modelos.Explotacion"
+     * if the declaring class imports that package.
+     *
+     * @param simpleType        simple type name from return type
+     * @param imports           import statements of the declaring class
+     * @param declaringPkg      package of the declaring class
+     * @param simpleToQualified map of simple name → set of qualified names
+     * @return qualified name if resolvable, otherwise the simple name
+     */
+    private static String resolveTypeViaImports(String simpleType, java.util.List<String> imports,
+                                                 String declaringPkg,
+                                                 Map<String, Set<String>> simpleToQualified) {
+        if (simpleType == null || simpleType.isEmpty()) return simpleType;
+        if (simpleType.contains(".")) return simpleType;
+
+        // Check explicit imports: import com.app.Explotacion;
+        for (String imp : imports) {
+            if (imp.endsWith("." + simpleType)) {
+                return imp;
+            }
+        }
+
+        // Check wildcard imports: import com.app.*;
+        Set<String> qualifieds = simpleToQualified.getOrDefault(simpleType, Set.of());
+        for (String imp : imports) {
+            if (imp.endsWith(".*")) {
+                String pkg = imp.substring(0, imp.length() - 2);
+                String candidate = pkg + "." + simpleType;
+                if (qualifieds.contains(candidate)) {
+                    return candidate;
+                }
+            }
+        }
+
+        // Same package?
+        if (declaringPkg != null && !declaringPkg.isEmpty()) {
+            String samePackage = declaringPkg + "." + simpleType;
+            if (qualifieds.contains(samePackage)) {
+                return samePackage;
+            }
+        }
+
+        // Only one qualified name exists — use it
+        if (qualifieds.size() == 1) {
+            return qualifieds.iterator().next();
+        }
+
+        return simpleType;
     }
 
     /**

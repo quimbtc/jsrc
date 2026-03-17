@@ -85,6 +85,70 @@ class ReturnTypeResolutionTest {
                 "Should resolve .getPais() via IdiomaDefecto return type");
     }
 
+    @Test
+    @DisplayName("Should disambiguate return types when same simple name exists in multiple packages")
+    void shouldDisambiguateByImports() throws Exception {
+        // Two classes named "Explotacion" in different packages
+        writeFile("ExplotacionModelo.java", """
+                package com.modelos;
+                public class Explotacion {
+                    public Idioma getIdiomaDefecto() { return null; }
+                }
+                """);
+        writeFile("ExplotacionDTO.java", """
+                package com.dto;
+                public class Explotacion {
+                    public String getNombre() { return null; }
+                }
+                """);
+        writeFile("Idioma.java", """
+                package com.modelos;
+                public class Idioma {
+                    public String getIdioma() { return null; }
+                }
+                """);
+        // Facturacion imports the modelo Explotacion, not the DTO one
+        writeFile("Facturacion.java", """
+                package com.negocio;
+                import com.modelos.Explotacion;
+                public class Facturacion {
+                    public Explotacion getExplotacion() { return null; }
+                }
+                """);
+        writeFile("Gestor.java", """
+                package com.negocio;
+                public class Gestor {
+                    public void process(Facturacion fto) {
+                        String idioma = fto.getExplotacion().getIdiomaDefecto().getIdioma();
+                    }
+                }
+                """);
+
+        var files = Files.list(tempDir).filter(p -> p.toString().endsWith(".java")).toList();
+        var parser = new HybridJavaParser();
+        var index = new CodebaseIndex();
+        index.build(parser, files, tempDir, List.of());
+        index.save(tempDir);
+
+        var loaded = CodebaseIndex.load(tempDir);
+        var graph = new CallGraphBuilder();
+        graph.loadFromIndex(loaded);
+
+        var targets = graph.findMethodsByName("process");
+        Set<String> calleeDescriptions = targets.stream()
+                .flatMap(t -> graph.getCalleesOf(t).stream())
+                .map(c -> c.callee().className() + "." + c.callee().methodName())
+                .collect(Collectors.toSet());
+
+        // Should resolve to Explotacion (modelo), not Explotacion (DTO)
+        assertTrue(calleeDescriptions.contains("Explotacion.getIdiomaDefecto"),
+                "Should resolve getIdiomaDefecto via modelo Explotacion. Got: " + calleeDescriptions);
+
+        // Should NOT have ?.getIdiomaDefecto
+        assertFalse(calleeDescriptions.stream().anyMatch(d -> d.startsWith("?.")),
+                "All callees should be resolved. Got: " + calleeDescriptions);
+    }
+
     private Path writeFile(String name, String content) throws IOException {
         Path file = tempDir.resolve(name);
         Files.writeString(file, content);
