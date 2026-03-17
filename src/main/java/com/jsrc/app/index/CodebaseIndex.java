@@ -98,8 +98,12 @@ public class CodebaseIndex {
 
                 // Need to re-index
                 List<ClassInfo> classes = parser.parseClasses(file);
+
+                // Extract imports from file for return type resolution
+                List<String> fileImports = extractImports(file, edgeParser);
+
                 List<IndexedClass> indexed = classes.stream()
-                        .map(ci -> toIndexedClass(ci, file, parser))
+                        .map(ci -> toIndexedClass(ci, file, parser, fileImports))
                         .toList();
 
                 // Extract call edges (direct + reflective)
@@ -425,7 +429,8 @@ public class CodebaseIndex {
         return edges;
     }
 
-    private IndexedClass toIndexedClass(ClassInfo ci, Path file, CodeParser parser) {
+    private IndexedClass toIndexedClass(ClassInfo ci, Path file, CodeParser parser,
+                                        List<String> fileImports) {
         List<IndexedMethod> methods = ci.methods().stream()
                 .map(m -> new IndexedMethod(
                         m.name(), m.signature(), m.startLine(), m.endLine(),
@@ -440,7 +445,23 @@ public class CodebaseIndex {
                 ci.name(), ci.packageName(), ci.startLine(), ci.endLine(),
                 ci.isInterface(), ci.isAbstract(),
                 ci.superClass().isEmpty() ? List.of() : List.of(ci.superClass()),
-                ci.interfaces(), methods, annotations, List.of());
+                ci.interfaces(), methods, annotations, fileImports);
+    }
+
+    /**
+     * Extracts import statements from a Java file.
+     */
+    private static List<String> extractImports(Path file, JavaParser jp) {
+        try {
+            String source = Files.readString(file);
+            var result = jp.parse(source);
+            if (!result.getResult().isPresent()) return List.of();
+            return result.getResult().get().getImports().stream()
+                    .map(imp -> imp.getNameAsString() + (imp.isAsterisk() ? ".*" : ""))
+                    .toList();
+        } catch (Exception e) {
+            return List.of();
+        }
     }
 
     private Map<String, Object> entryToMap(IndexEntry entry) {
@@ -484,6 +505,9 @@ public class CodebaseIndex {
         map.put("interfaces", ic.interfaces());
         map.put("methods", ic.methods().stream().map(this::methodToMap).toList());
         map.put("annotations", ic.annotations());
+        if (!ic.imports().isEmpty()) {
+            map.put("imports", ic.imports());
+        }
         return map;
     }
 
