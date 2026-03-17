@@ -199,20 +199,11 @@ public class CallGraphBuilder {
     }
 
     /**
-     * Resolves "?field:" and "?ret:" callee class markers.
-     * These are produced by CodebaseIndex when a method is called on a field access
-     * or method return expression.
-     * <p>
-     * Example: {@code svc.resultado.toString()} → callee "?field:Service.resultado"
-     * → looks up Service.resultado = StringBuilder → resolves to StringBuilder.toString()
-     * <p>
-     * Runs iteratively to handle nested field/return type chains.
+     * Resolves "?field:" and "?ret:" callee class markers in the call graph.
+     * Delegates marker parsing to {@link com.jsrc.app.index.EdgeResolver#resolveMarker}.
      */
     private void resolveFieldMarkers(Map<String, String> fieldTypeMap) {
-        // Also build return type map from allMethods + calleeIndex
         Map<String, String> returnTypeMap = new HashMap<>();
-        // returnTypeMap is populated externally; here we only have fieldTypeMap.
-        // ?ret: markers that remain will be resolved in the main resolvePass.
 
         for (int pass = 0; pass < 5; pass++) {
             boolean changed = false;
@@ -225,8 +216,9 @@ public class CallGraphBuilder {
 
                 for (MethodCall call : calls) {
                     String calleeClass = call.callee().className();
-                    if (calleeClass.startsWith("?field:")) {
-                        String resolved = resolveMarkerChain(calleeClass, fieldTypeMap, returnTypeMap);
+                    if (calleeClass.startsWith("?field:") || calleeClass.startsWith("?ret:")) {
+                        String resolved = com.jsrc.app.index.EdgeResolver.resolveMarker(
+                                calleeClass, fieldTypeMap, returnTypeMap);
                         if (resolved != null && !resolved.startsWith("?")) {
                             MethodReference newCallee = new MethodReference(
                                     resolved, call.callee().methodName(),
@@ -255,47 +247,6 @@ public class CallGraphBuilder {
                 break;
             }
         }
-    }
-
-    /**
-     * Resolves a marker chain ("?field:" or "?ret:") to a concrete type.
-     */
-    private String resolveMarkerChain(String marker,
-                                       Map<String, String> fieldTypeMap,
-                                       Map<String, String> returnTypeMap) {
-        if (marker.startsWith("?field:")) {
-            String payload = marker.substring("?field:".length());
-            int dotIdx = payload.lastIndexOf('.');
-            if (dotIdx < 0) return null;
-
-            String ownerType = payload.substring(0, dotIdx);
-            String fieldName = payload.substring(dotIdx + 1);
-
-            if (ownerType.startsWith("?")) {
-                ownerType = resolveMarkerChain(ownerType, fieldTypeMap, returnTypeMap);
-                if (ownerType == null || ownerType.startsWith("?")) return null;
-            }
-
-            return fieldTypeMap.get(ownerType + "." + fieldName);
-        }
-
-        if (marker.startsWith("?ret:")) {
-            String payload = marker.substring("?ret:".length());
-            int dotIdx = payload.lastIndexOf('.');
-            if (dotIdx < 0) return null;
-
-            String ownerType = payload.substring(0, dotIdx);
-            String methodName = payload.substring(dotIdx + 1);
-
-            if (ownerType.startsWith("?")) {
-                ownerType = resolveMarkerChain(ownerType, fieldTypeMap, returnTypeMap);
-                if (ownerType == null || ownerType.startsWith("?")) return null;
-            }
-
-            return returnTypeMap.get(ownerType + "." + methodName);
-        }
-
-        return marker;
     }
 
     /**
