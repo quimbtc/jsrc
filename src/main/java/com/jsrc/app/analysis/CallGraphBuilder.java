@@ -69,18 +69,13 @@ public class CallGraphBuilder {
 
         Map<String, ClassContext> classContexts = new HashMap<>();
 
-        // Pass 1: register class contexts (fields, method signatures) — no AST retained
+        // Single pass: parse each file once, register classes and analyze calls together.
+        // Receiver types from files not yet processed resolve to "?" and are fixed up
+        // in the post-processing step (resolveUnknownCallees / resolveFieldMarkers).
         for (Path file : javaFiles) {
             CompilationUnit cu = parseFile(file);
             if (cu == null) continue;
             registerClasses(cu, file, classContexts);
-            // cu goes out of scope → GC can reclaim
-        }
-
-        // Pass 2: re-parse and analyze calls one file at a time
-        for (Path file : javaFiles) {
-            CompilationUnit cu = parseFile(file);
-            if (cu == null) continue;
             analyzeMethodCalls(cu, file, classContexts);
             // cu goes out of scope → GC can reclaim
         }
