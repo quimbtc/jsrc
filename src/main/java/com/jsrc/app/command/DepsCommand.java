@@ -1,6 +1,5 @@
 package com.jsrc.app.command;
 
-import com.jsrc.app.analysis.DependencyAnalyzer;
 
 public class DepsCommand implements Command {
     private final String className;
@@ -11,7 +10,7 @@ public class DepsCommand implements Command {
 
     @Override
     public int execute(CommandContext ctx) {
-        var analyzer = new DependencyAnalyzer();
+        var analyzer = ctx.dependencyAnalyzer();
         var result = analyzer.analyze(ctx.javaFiles(), className);
         if (result != null) {
             ctx.formatter().printDependencies(result);

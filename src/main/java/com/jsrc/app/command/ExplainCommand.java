@@ -7,7 +7,6 @@ import java.util.Map;
 import com.jsrc.app.architecture.LayerResolver;
 import com.jsrc.app.output.JsonWriter;
 import com.jsrc.app.analysis.CallGraph;
-import com.jsrc.app.analysis.DependencyAnalyzer;
 import com.jsrc.app.parser.model.ClassInfo;
 
 /**
@@ -41,7 +40,7 @@ public class ExplainCommand implements Command {
         }
 
         // Dependencies
-        var analyzer = new DependencyAnalyzer();
+        var analyzer = ctx.dependencyAnalyzer();
         var deps = analyzer.analyze(ctx.javaFiles(), ci.name());
         if (deps != null) {
             int fieldCount = deps.fieldDependencies().size();

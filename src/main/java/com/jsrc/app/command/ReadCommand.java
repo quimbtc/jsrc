@@ -16,7 +16,7 @@ public class ReadCommand implements Command {
 
     @Override
     public int execute(CommandContext ctx) {
-        var reader = new SourceReader(ctx.parser());
+        var reader = ctx.sourceReader();
         var ref = MethodResolver.parse(target);
         SourceReader.ReadResult result;
 

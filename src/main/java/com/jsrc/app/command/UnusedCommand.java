@@ -9,7 +9,6 @@ import java.util.Set;
 
 import com.jsrc.app.output.JsonWriter;
 import com.jsrc.app.analysis.CallGraph;
-import com.jsrc.app.analysis.DependencyAnalyzer;
 import com.jsrc.app.parser.model.ClassInfo;
 import com.jsrc.app.parser.model.MethodReference;
 
@@ -21,7 +20,7 @@ public class UnusedCommand implements Command {
     @Override
     public int execute(CommandContext ctx) {
         var allClasses = ctx.getAllClasses();
-        var analyzer = new DependencyAnalyzer();
+        var analyzer = ctx.dependencyAnalyzer();
 
         // Build call graph for method usage
         CallGraph graph = ctx.callGraph();

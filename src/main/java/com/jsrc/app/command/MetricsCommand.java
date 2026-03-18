@@ -4,7 +4,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import com.jsrc.app.output.JsonWriter;
-import com.jsrc.app.analysis.DependencyAnalyzer;
 import com.jsrc.app.parser.model.ClassInfo;
 import com.jsrc.app.parser.model.MethodInfo;
 
@@ -39,7 +38,7 @@ public class MetricsCommand implements Command {
         // Coupling: count unique dependencies
         // Use index to find the specific file instead of scanning all files
         int coupling = 0;
-        var analyzer = new DependencyAnalyzer();
+        var analyzer = ctx.dependencyAnalyzer();
         java.util.List<java.nio.file.Path> targetFiles = resolveClassFiles(ctx, ci.name());
         var deps = analyzer.analyze(targetFiles, ci.name());
         if (deps != null) {

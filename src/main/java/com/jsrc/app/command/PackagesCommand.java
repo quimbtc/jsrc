@@ -9,7 +9,6 @@ import java.util.Set;
 import java.util.TreeMap;
 
 import com.jsrc.app.output.JsonWriter;
-import com.jsrc.app.analysis.DependencyAnalyzer;
 import com.jsrc.app.parser.model.ClassInfo;
 
 /**
@@ -19,7 +18,7 @@ public class PackagesCommand implements Command {
     @Override
     public int execute(CommandContext ctx) {
         var allClasses = ctx.getAllClasses();
-        var analyzer = new DependencyAnalyzer();
+        var analyzer = ctx.dependencyAnalyzer();
 
         // Group classes by package
         Map<String, List<ClassInfo>> byPackage = new TreeMap<>();

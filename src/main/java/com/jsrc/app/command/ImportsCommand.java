@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.Map;
 
 import com.jsrc.app.output.JsonWriter;
-import com.jsrc.app.analysis.DependencyAnalyzer;
 import com.jsrc.app.parser.model.ClassInfo;
 
 /**
@@ -23,7 +22,7 @@ public class ImportsCommand implements Command {
 
     @Override
     public int execute(CommandContext ctx) {
-        var analyzer = new DependencyAnalyzer();
+        var analyzer = ctx.dependencyAnalyzer();
         var allClasses = ctx.getAllClasses();
         List<Map<String, Object>> dependents = new ArrayList<>();
 
