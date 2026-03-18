@@ -4,7 +4,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 
-import com.jsrc.app.ExitCode;
+import com.jsrc.app.exception.JsrcIOException;
 import com.jsrc.app.output.JsonWriter;
 import com.jsrc.app.parser.model.ClassInfo;
 import com.jsrc.app.spec.SpecParser;
@@ -33,9 +33,7 @@ public class VerifyCommand implements Command {
             List<?> discs = (List<?>) result.get("discrepancies");
             return discs.size();
         } catch (IOException e) {
-            System.err.printf("Error reading spec: %s%n", e.getMessage());
-            System.exit(ExitCode.IO_ERROR);
-            return 0;
+            throw new JsrcIOException("Error reading spec: " + e.getMessage(), e);
         }
     }
 }

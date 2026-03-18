@@ -4,7 +4,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-import com.jsrc.app.ExitCode;
+import com.jsrc.app.exception.JsrcIOException;
 import com.jsrc.app.index.CodebaseIndex;
 
 public class IndexCommand implements Command {
@@ -31,8 +31,7 @@ public class IndexCommand implements Command {
             System.err.printf("Done. Indexed %d files (%d re-indexed, %d cached).%n",
                     ctx.javaFiles().size(), reindexed, ctx.javaFiles().size() - reindexed);
         } catch (IOException ex) {
-            System.err.printf("Error saving index: %s%n", ex.getMessage());
-            System.exit(ExitCode.IO_ERROR);
+            throw new JsrcIOException("Error saving index: " + ex.getMessage(), ex);
         }
         return 0;
     }

@@ -2,8 +2,8 @@ package com.jsrc.app.command;
 
 import java.nio.file.Path;
 
-import com.jsrc.app.ExitCode;
 import com.jsrc.app.architecture.LayerResolver;
+import com.jsrc.app.exception.BadUsageException;
 
 public class LayerCommand implements Command {
     private final String layerName;
@@ -15,8 +15,7 @@ public class LayerCommand implements Command {
     @Override
     public int execute(CommandContext ctx) {
         if (ctx.config() == null || ctx.config().architecture().layers().isEmpty()) {
-            System.err.println("Error: No architecture layers defined in .jsrc.yaml");
-            System.exit(ExitCode.BAD_USAGE);
+            throw new BadUsageException("No architecture layers defined in .jsrc.yaml");
         }
         var allClasses = ctx.getAllClasses();
         var resolver = new LayerResolver(ctx.config().architecture().layers());

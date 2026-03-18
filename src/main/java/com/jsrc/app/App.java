@@ -8,6 +8,8 @@ import com.jsrc.app.codebase.CodeBase;
 import com.jsrc.app.codebase.CodeBaseLoader;
 import com.jsrc.app.codebase.JavaCodeBase;
 import com.jsrc.app.command.*;
+import com.jsrc.app.exception.BadUsageException;
+import com.jsrc.app.exception.JsrcException;
 import com.jsrc.app.model.ExecutionMetrics;
 import com.jsrc.app.output.JsonWriter;
 import com.jsrc.app.output.OutputFormatter;
@@ -24,19 +26,37 @@ import com.jsrc.app.index.IndexedCodebase;
 public class App {
 
     public static void main(String[] args) {
+        try {
+            int exitCode = run(args);
+            if (exitCode != ExitCode.OK) {
+                System.exit(exitCode);
+            }
+        } catch (JsrcException e) {
+            System.err.println("Error: " + e.getMessage());
+            System.exit(e.exitCode());
+        }
+    }
+
+    /**
+     * Core logic, separated from main() for testability.
+     * Returns an exit code instead of calling System.exit().
+     *
+     * @throws JsrcException on structured errors
+     */
+    static int run(String[] args) {
         ParsedArgs parsed = CliBootstrap.parse(args);
-        if (parsed == null) return;
+        if (parsed == null) return ExitCode.OK;
 
         // Handle --help
         if ("--help".equals(parsed.command())) {
             printHelp();
-            return;
+            return ExitCode.OK;
         }
 
         // Handle --describe (no source root needed)
         if ("--describe".equals(parsed.command())) {
             handleDescribe(parsed);
-            return;
+            return ExitCode.OK;
         }
 
         OutputFormatter formatter = OutputFormatter.create(
@@ -84,12 +104,13 @@ public class App {
 
         // Exit code
         if (resultCount == 0 && !"--index".equals(parsed.command())) {
-            System.exit(ExitCode.NOT_FOUND);
+            return ExitCode.NOT_FOUND;
         }
+        return ExitCode.OK;
     }
 
     private static void handleDescribe(ParsedArgs parsed) {
-        var argList = parsed.remainingArgs();
+        var argList = new java.util.ArrayList<>(parsed.remainingArgs());
         argList.remove("--describe");
         if (argList.isEmpty()) {
             CommandRegistry.describeAll(parsed.jsonOutput());
@@ -97,9 +118,8 @@ public class App {
             String target = argList.getFirst();
             if (!target.startsWith("--")) target = "--" + target;
             if (!CommandRegistry.describeCommand(target, parsed.jsonOutput())) {
-                System.err.println("Unknown command: " + target);
                 CommandRegistry.describeAll(parsed.jsonOutput());
-                System.exit(ExitCode.BAD_USAGE);
+                throw new BadUsageException("Unknown command: " + target);
             }
         }
     }
@@ -110,8 +130,7 @@ public class App {
             String cls = requireArg(argList, "--verify", "class name");
             int specIdx = argList.indexOf("--spec");
             if (specIdx < 0 || specIdx + 1 >= argList.size()) {
-                System.err.println("Error: --verify requires --spec <path.md>");
-                System.exit(ExitCode.BAD_USAGE);
+                throw new BadUsageException("--verify requires --spec <path.md>");
             }
             return new VerifyCommand(cls, argList.get(specIdx + 1));
         }
@@ -134,10 +153,10 @@ public class App {
         if (arg != null && command.startsWith("--") && !arg.startsWith("--")) {
             if (List.of("--callers", "--callees", "--read", "--search", "--call-chain", "--smells").contains(command)) {
                 String err = InputValidator.validateMethodRef(arg, "argument");
-                if (err != null) { System.err.println("Error: " + err); System.exit(ExitCode.BAD_USAGE); }
+                if (err != null) { throw new BadUsageException(err); }
             } else {
                 String err = InputValidator.validateIdentifier(arg, "argument");
-                if (err != null) { System.err.println("Error: " + err); System.exit(ExitCode.BAD_USAGE); }
+                if (err != null) { throw new BadUsageException(err); }
             }
         }
 
@@ -148,9 +167,7 @@ public class App {
         // Non-flag = method search
         if (!command.startsWith("--")) return CommandFactory.createMethodSearch(command);
 
-        System.err.println("Unknown command: " + command);
-        System.exit(ExitCode.BAD_USAGE);
-        return null;
+        throw new BadUsageException("Unknown command: " + command);
     }
 
     private static String extractArg(List<String> argList, String command) {
@@ -168,14 +185,11 @@ public class App {
             String value = argList.get(argPos);
             String error = InputValidator.validateIdentifier(value, label);
             if (error != null) {
-                System.err.println("Error: " + error);
-                System.exit(ExitCode.BAD_USAGE);
+                throw new BadUsageException(error);
             }
             return value;
         }
-        System.err.printf("Error: %s requires a %s%n", command, label);
-        System.exit(ExitCode.BAD_USAGE);
-        return null;
+        throw new BadUsageException(command + " requires a " + label);
     }
 
     private static String requireMethodArg(List<String> argList, String command) {
@@ -184,14 +198,11 @@ public class App {
             String value = argList.get(argPos);
             String error = InputValidator.validateMethodRef(value, "argument");
             if (error != null) {
-                System.err.println("Error: " + error);
-                System.exit(ExitCode.BAD_USAGE);
+                throw new BadUsageException(error);
             }
             return value;
         }
-        System.err.printf("Error: %s requires an argument%n", command);
-        System.exit(ExitCode.BAD_USAGE);
-        return null;
+        throw new BadUsageException(command + " requires an argument");
     }
 
     private static void printHelp() {

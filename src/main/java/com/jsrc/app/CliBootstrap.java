@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Set;
 
 import com.jsrc.app.config.ProjectConfig;
+import com.jsrc.app.exception.BadUsageException;
 import com.jsrc.app.output.FieldsFilter;
 import com.jsrc.app.util.InputValidator;
 
@@ -61,21 +62,17 @@ public final class CliBootstrap {
             rootPath = resolveRoot(config);
             command = argList.get(0);
         } else {
-            printUsage();
-            System.exit(ExitCode.BAD_USAGE);
-            return null;
+            throw new BadUsageException("Usage: jsrc [source-root] <command> [args] [flags]");
         }
 
         // Validate
         String pathError = InputValidator.validatePath(rootPath, "Source root");
         if (pathError != null) {
-            System.err.println("Error: " + pathError);
-            System.exit(ExitCode.BAD_USAGE);
+            throw new BadUsageException(pathError);
         }
         String cmdError = InputValidator.validateCommand(command);
         if (cmdError != null) {
-            System.err.println("Error: " + cmdError);
-            System.exit(ExitCode.BAD_USAGE);
+            throw new BadUsageException(cmdError);
         }
 
         return new ParsedArgs(jsonOutput, mdOutput, signatureOnly, showMetrics,

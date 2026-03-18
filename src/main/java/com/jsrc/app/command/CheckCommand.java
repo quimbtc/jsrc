@@ -1,7 +1,7 @@
 package com.jsrc.app.command;
 
-import com.jsrc.app.ExitCode;
 import com.jsrc.app.architecture.RuleEngine;
+import com.jsrc.app.exception.BadUsageException;
 
 public class CheckCommand implements Command {
     private final String ruleId;
@@ -13,8 +13,7 @@ public class CheckCommand implements Command {
     @Override
     public int execute(CommandContext ctx) {
         if (ctx.config() == null || ctx.config().architecture().rules().isEmpty()) {
-            System.err.println("Error: No architecture rules defined in .jsrc.yaml");
-            System.exit(ExitCode.BAD_USAGE);
+            throw new BadUsageException("No architecture rules defined in .jsrc.yaml");
         }
         var allClasses = ctx.getAllClasses();
         var engine = new RuleEngine(ctx.config().architecture());
