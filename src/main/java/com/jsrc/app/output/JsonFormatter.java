@@ -233,20 +233,10 @@ public class JsonFormatter implements OutputFormatter {
     }
 
     @Override
-    public void printCallChains(List<CallChain> chains, String methodName) {
-        printCallChains(chains, methodName, java.util.Map.of());
-    }
-
-    @Override
-    public void printCallChains(List<CallChain> chains, String methodName,
-                                 java.util.Map<String, String> signatures) {
-        printCallChains(chains, methodName, signatures, java.util.Set.of());
-    }
-
-    @Override
-    public void printCallChains(List<CallChain> chains, String methodName,
-                                 java.util.Map<String, String> signatures,
-                                 java.util.Set<String> deadEndRoots) {
+    public void printCallChains(com.jsrc.app.model.CallChainOutput output) {
+        var chains = output.chains();
+        var signatures = output.signatures();
+        var deadEndRoots = output.deadEndRoots();
         this.currentSignatures = signatures;
         List<Map<String, Object>> items = chains.stream()
                 .map(chain -> {

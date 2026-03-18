@@ -97,7 +97,8 @@ public class CallChainCommand implements Command {
             }
         }
 
-        ctx.formatter().printCallChains(chains, methodName, signatures, deadEndRoots);
+        ctx.formatter().printCallChains(
+                new com.jsrc.app.model.CallChainOutput(chains, methodName, signatures, deadEndRoots));
 
         if (!chains.isEmpty()) {
             MermaidDiagramGenerator generator = new MermaidDiagramGenerator(signatures, deadEndRoots);

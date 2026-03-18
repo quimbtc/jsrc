@@ -92,7 +92,7 @@ class OutputFormatterTest {
             MethodReference app = new MethodReference("App", "main", 0, null);
             MethodReference svc = new MethodReference("Service", "process", 1, null);
             CallChain chain = new CallChain(List.of(new MethodCall(app, svc, 10)));
-            fmt.printCallChains(List.of(chain), "process");
+            fmt.printCallChains(new com.jsrc.app.model.CallChainOutput(List.of(chain), "process"));
         });
         assertTrue(out.startsWith("["), "Call chain JSON should be an array");
         assertTrue(out.contains("\"summary\":"));

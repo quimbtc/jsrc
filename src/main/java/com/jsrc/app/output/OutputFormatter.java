@@ -8,7 +8,6 @@ import com.jsrc.app.model.AnnotationMatch;
 import com.jsrc.app.model.DependencyResult;
 import com.jsrc.app.model.HierarchyResult;
 import com.jsrc.app.model.OverviewResult;
-import com.jsrc.app.parser.model.CallChain;
 import com.jsrc.app.parser.model.ClassInfo;
 import com.jsrc.app.parser.model.CodeSmell;
 import com.jsrc.app.parser.model.MethodInfo;
@@ -110,24 +109,9 @@ public interface OutputFormatter {
     /**
      * Prints call chain analysis results.
      *
-     * @param chains     discovered call chains
-     * @param methodName target method name
+     * @param output call chain output with chains, method name, signatures, dead-end roots
      */
-    void printCallChains(List<CallChain> chains, String methodName);
-
-    /**
-     * Prints call chain results with method parameter signatures.
-     */
-    default void printCallChains(List<CallChain> chains, String methodName,
-                                  java.util.Map<String, String> signatures) {
-        printCallChains(chains, methodName);
-    }
-
-    default void printCallChains(List<CallChain> chains, String methodName,
-                                  java.util.Map<String, String> signatures,
-                                  java.util.Set<String> deadEndRoots) {
-        printCallChains(chains, methodName, signatures);
-    }
+    void printCallChains(com.jsrc.app.model.CallChainOutput output);
 
     /**
      * Prints a generic result (Map or List) with field filtering applied.
