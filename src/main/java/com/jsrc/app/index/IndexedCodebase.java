@@ -117,17 +117,7 @@ public class IndexedCodebase {
         return new IndexedCodebase(refreshed);
     }
 
-    /**
-     * Tries to load without auto-refresh (original behavior).
-     */
-    public static IndexedCodebase tryLoad(Path sourceRoot) {
-        List<IndexEntry> entries = CodebaseIndex.load(sourceRoot);
-        if (entries.isEmpty()) {
-            return null;
-        }
-        logger.info("Using index with {} file entries", entries.size());
-        return new IndexedCodebase(entries);
-    }
+    // tryLoad(Path) without refresh removed — use tryLoad(Path, List<Path>) which auto-refreshes
 
     /**
      * Returns all classes from the index, converted to ClassInfo.
