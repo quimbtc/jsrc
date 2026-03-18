@@ -3,7 +3,6 @@ package com.jsrc.app.command;
 import com.jsrc.app.output.MarkdownFormatter;
 import com.jsrc.app.analysis.ContextAssembler;
 import com.jsrc.app.parser.model.ClassInfo;
-import com.jsrc.app.util.ClassResolver;
 
 public class ContextCommand implements Command {
     private final String className;
@@ -21,10 +20,12 @@ public class ContextCommand implements Command {
         if (resolved == null) return 0;
 
         var arch = ctx.config() != null ? ctx.config().architecture() : null;
-        var assembler = new ContextAssembler(ctx.parser());
-        var ctxMap = assembler.assemble(ctx.javaFiles(), resolved.name(), allClasses, arch);
-        if (ctxMap == null) return 0;
+        var assembler = new ContextAssembler(ctx.parser(), ctx.dependencyAnalyzer());
+        var result = assembler.assemble(
+                ctx.javaFiles(), resolved.name(), allClasses, arch, ctx.callGraph());
+        if (result == null) return 0;
 
+        var ctxMap = result.toMap();
         if (mdOutput) {
             System.out.println(MarkdownFormatter.toMarkdown(ctxMap));
         } else {

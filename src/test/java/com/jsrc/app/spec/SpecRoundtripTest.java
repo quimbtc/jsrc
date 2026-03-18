@@ -45,12 +45,12 @@ class SpecRoundtripTest {
 
         // Assemble context
         var assembler = new ContextAssembler(parser);
-        Map<String, Object> ctx = assembler.assemble(
+        var result = assembler.assemble(
                 List.of(javaFile), "Calculator", allClasses, null);
-        assertNotNull(ctx);
+        assertNotNull(result);
 
         // Generate Markdown
-        String markdown = MarkdownFormatter.toMarkdown(ctx);
+        String markdown = MarkdownFormatter.toMarkdown(result.toMap());
         assertNotNull(markdown);
         assertTrue(markdown.contains("# Calculator"));
         assertTrue(markdown.contains("add"));
@@ -65,10 +65,10 @@ class SpecRoundtripTest {
 
         // Verify
         ClassInfo impl = allClasses.getFirst();
-        Map<String, Object> result = SpecVerifier.verify(impl, spec);
-        assertEquals(Boolean.TRUE, result.get("pass"));
+        Map<String, Object> verifyResult = SpecVerifier.verify(impl, spec);
+        assertEquals(Boolean.TRUE, verifyResult.get("pass"));
         @SuppressWarnings("unchecked")
-        List<?> discs = (List<?>) result.get("discrepancies");
+        List<?> discs = (List<?>) verifyResult.get("discrepancies");
         assertTrue(discs.isEmpty(), "Roundtrip should produce 0 discrepancies");
     }
 
