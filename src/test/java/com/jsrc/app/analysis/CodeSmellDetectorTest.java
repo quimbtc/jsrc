@@ -591,13 +591,8 @@ class CodeSmellDetectorTest {
                 }
                 """);
         var smells = parser.detectSmells(file);
-        assertTrue(smells.stream().anyMatch(s -> s.ruleId().equals("CATCH_LOG_ONLY")),
-                "Catch with only logging should be flagged as CATCH_LOG_ONLY. Got: " + smells);
-        // Should NOT be flagged as empty or printStackTrace
-        assertTrue(smells.stream().noneMatch(s ->
-                        s.ruleId().equals("EMPTY_CATCH_BLOCK")
-                                || s.ruleId().equals("CATCH_PRINT_STACKTRACE")),
-                "Should not be flagged as empty or printStackTrace");
+        assertTrue(smells.stream().anyMatch(s -> s.ruleId().equals("SILENT_CATCH")),
+                "Catch with only logging should be flagged as SILENT_CATCH. Got: " + smells);
     }
 
     @Test

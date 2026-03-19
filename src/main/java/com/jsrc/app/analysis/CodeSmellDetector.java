@@ -127,25 +127,24 @@ public class CodeSmellDetector {
             boolean hasReturn = false;
             boolean hasRealHandling = false;
 
-            boolean hasLoggingOnly = false;
-
             for (var stmt : statements) {
                 String s = stmt.toString().trim();
                 if (s.contains("printStackTrace")) hasPrintStackTrace = true;
                 else if (s.equals("continue;")) hasContinue = true;
                 else if (s.equals("return null;")) hasReturnNull = true;
                 else if (s.equals("return;")) hasReturn = true;
-                else if (isLoggingStatement(s)) hasLoggingOnly = true;
+                else if (isLoggingStatement(s)) { /* logging = not real handling */ }
                 else hasRealHandling = true; // rethrow, wrap, set flag, etc.
             }
 
-            // Only flag silent patterns if there's NO real handling (rethrow, wrap, set flag)
+            // Only flag if there's NO real handling (rethrow, wrap, set flag)
+            // Logging is NOT real handling — caller is still unaware
             if (!hasRealHandling) {
-                // Log-only: logged but caller unaware
-                if (hasLoggingOnly && !hasContinue && !hasReturnNull && !hasReturn && !hasPrintStackTrace) {
+                // If nothing else flagged, the catch only logs (or is trivial)
+                if (!hasContinue && !hasReturnNull && !hasReturn && !hasPrintStackTrace) {
                     smells.add(new CodeSmell(
-                            "CATCH_LOG_ONLY", Severity.INFO,
-                            "Catch block only logs — caller unaware of failure",
+                            "SILENT_CATCH", Severity.WARNING,
+                            "Catch block does not propagate error — caller unaware of failure",
                             line, methodName, className));
                 }
                 if (hasContinue) {
