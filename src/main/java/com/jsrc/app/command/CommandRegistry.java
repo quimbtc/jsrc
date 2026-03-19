@@ -90,7 +90,21 @@ public final class CommandRegistry {
             new CommandDef("<methodName>", "Search for methods by name",
                     List.of(), List.of("--json", "--signature-only", "--fields", "--metrics"), "array"),
             new CommandDef("--describe", "List available commands and their metadata",
-                    List.of("[commandName]"), List.of("--json"), "array or object")
+                    List.of("[commandName]"), List.of("--json"), "array or object"),
+            new CommandDef("--validate", "Verify if a method exists, suggest closest if not (anti-hallucination)",
+                    List.of("<Class.method>"), List.of("--json"), "object"),
+            new CommandDef("--mini", "Ultra-compact class summary (<500 chars) for small context windows",
+                    List.of("<className>"), List.of("--json"), "object"),
+            new CommandDef("--related", "Classes related by coupling, ranked by score",
+                    List.of("<className>"), List.of("--json"), "object"),
+            new CommandDef("--impact", "Change impact analysis: callers, transitive affected, risk level",
+                    List.of("<Class.method>"), List.of("--json"), "object"),
+            new CommandDef("--scope", "Find relevant classes for a task by keyword matching",
+                    List.of("<keywords>"), List.of("--json"), "object"),
+            new CommandDef("--checklist", "Step-by-step change guide for a method modification",
+                    List.of("<Class.method>"), List.of("--json"), "object"),
+            new CommandDef("--type-check", "Verify method exists and check return type",
+                    List.of("<Class.method>"), List.of("--json"), "object")
     );
 
     /**
