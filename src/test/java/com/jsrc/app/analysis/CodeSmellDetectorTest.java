@@ -511,6 +511,72 @@ class CodeSmellDetectorTest {
     }
 
     @Test
+    @DisplayName("Should detect printStackTrace + continue combo")
+    void shouldDetectPrintStackTraceWithContinue() throws IOException {
+        Path file = writeFile("ComboA.java", """
+                public class ComboA {
+                    public void process(java.util.List<String> items) {
+                        for (String item : items) {
+                            try {
+                                Integer.parseInt(item);
+                            } catch (NumberFormatException e) {
+                                e.printStackTrace();
+                                continue;
+                            }
+                        }
+                    }
+                }
+                """);
+        var smells = parser.detectSmells(file);
+        assertTrue(smells.stream().anyMatch(s -> s.ruleId().equals("CATCH_PRINT_STACKTRACE")),
+                "Should detect printStackTrace in combo. Got: " + smells);
+        assertTrue(smells.stream().anyMatch(s -> s.ruleId().equals("SILENT_CATCH_CONTINUE")),
+                "Should detect continue in combo. Got: " + smells);
+    }
+
+    @Test
+    @DisplayName("Should detect printStackTrace + return null combo")
+    void shouldDetectPrintStackTraceWithReturnNull() throws IOException {
+        Path file = writeFile("ComboB.java", """
+                public class ComboB {
+                    public String load() {
+                        try {
+                            return "data";
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                            return null;
+                        }
+                    }
+                }
+                """);
+        var smells = parser.detectSmells(file);
+        assertTrue(smells.stream().anyMatch(s -> s.ruleId().equals("CATCH_PRINT_STACKTRACE")),
+                "Should detect printStackTrace. Got: " + smells);
+        assertTrue(smells.stream().anyMatch(s -> s.ruleId().equals("SILENT_CATCH_RETURN_NULL")),
+                "Should detect return null. Got: " + smells);
+    }
+
+    @Test
+    @DisplayName("Should NOT flag if catch has real handling alongside printStackTrace")
+    void shouldNotFlagIfRealHandlingPresent() throws IOException {
+        Path file = writeFile("RealHandling.java", """
+                public class RealHandling {
+                    public void process() {
+                        try {
+                            Thread.sleep(100);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                            throw new RuntimeException("Failed", e);
+                        }
+                    }
+                }
+                """);
+        var smells = parser.detectSmells(file);
+        assertTrue(smells.stream().noneMatch(s -> s.ruleId().equals("CATCH_PRINT_STACKTRACE")),
+                "Should not flag — has real handling (rethrow). Got: " + smells);
+    }
+
+    @Test
     @DisplayName("Should NOT flag catch with logging")
     void shouldNotFlagCatchWithLogging() throws IOException {
         Path file = writeFile("LoggingCatch.java", """

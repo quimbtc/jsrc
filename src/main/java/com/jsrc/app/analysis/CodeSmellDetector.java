@@ -120,31 +120,43 @@ public class CodeSmellDetector {
                 continue;
             }
 
-            // Silent failure: catch with only 'continue'
-            if (statements.size() == 1) {
-                String stmt = statements.get(0).toString().trim();
-                if (stmt.equals("continue;")) {
+            // Analyze all statements for silent failure patterns
+            boolean hasPrintStackTrace = false;
+            boolean hasContinue = false;
+            boolean hasReturnNull = false;
+            boolean hasReturn = false;
+            boolean hasRealHandling = false;
+
+            for (var stmt : statements) {
+                String s = stmt.toString().trim();
+                if (s.contains("printStackTrace")) hasPrintStackTrace = true;
+                else if (s.equals("continue;")) hasContinue = true;
+                else if (s.equals("return null;")) hasReturnNull = true;
+                else if (s.equals("return;")) hasReturn = true;
+                else hasRealHandling = true; // logging, rethrow, etc.
+            }
+
+            // Only flag if there's NO real handling (logging, rethrow, etc.)
+            if (!hasRealHandling) {
+                if (hasContinue) {
                     smells.add(new CodeSmell(
                             "SILENT_CATCH_CONTINUE", Severity.WARNING,
-                            "Catch block only has 'continue' — exception silently skipped",
+                            "Catch block silently continues — exception swallowed",
                             line, methodName, className));
                 }
-                // Silent failure: catch with only 'return null'
-                else if (stmt.equals("return null;")) {
+                if (hasReturnNull) {
                     smells.add(new CodeSmell(
                             "SILENT_CATCH_RETURN_NULL", Severity.WARNING,
                             "Catch block returns null — error hidden from caller",
                             line, methodName, className));
                 }
-                // Silent failure: catch with only 'return'
-                else if (stmt.equals("return;")) {
+                if (hasReturn && !hasReturnNull) {
                     smells.add(new CodeSmell(
                             "SILENT_CATCH_RETURN", Severity.INFO,
                             "Catch block only returns — exception silently consumed",
                             line, methodName, className));
                 }
-                // Bad practice: catch with only printStackTrace
-                else if (stmt.contains("printStackTrace")) {
+                if (hasPrintStackTrace) {
                     smells.add(new CodeSmell(
                             "CATCH_PRINT_STACKTRACE", Severity.WARNING,
                             "Using printStackTrace() instead of proper logging",
