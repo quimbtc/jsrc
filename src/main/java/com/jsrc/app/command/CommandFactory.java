@@ -54,6 +54,7 @@ public final class CommandFactory {
             case "--mini" -> arg != null ? new MiniCommand(arg) : null;
             case "--related" -> arg != null ? new RelatedCommand(arg) : null;
             case "--impact" -> arg != null ? new ImpactCommand(arg) : null;
+            case "--scope" -> arg != null ? new ScopeCommand(arg) : null;
             default -> null;
         };
     }
