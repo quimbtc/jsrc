@@ -127,16 +127,27 @@ public class CodeSmellDetector {
             boolean hasReturn = false;
             boolean hasRealHandling = false;
 
+            boolean hasLoggingOnly = false;
+
             for (var stmt : statements) {
                 String s = stmt.toString().trim();
                 if (s.contains("printStackTrace")) hasPrintStackTrace = true;
                 else if (s.equals("continue;")) hasContinue = true;
                 else if (s.equals("return null;")) hasReturnNull = true;
                 else if (s.equals("return;")) hasReturn = true;
-                else hasRealHandling = true; // logging, rethrow, etc.
+                else if (isLoggingStatement(s)) hasLoggingOnly = true;
+                else hasRealHandling = true; // rethrow, wrap, set flag, etc.
             }
 
-            // Only flag if there's NO real handling (logging, rethrow, etc.)
+            // Log-only catch: exception logged but caller unaware
+            if (!hasRealHandling && hasLoggingOnly && !hasContinue && !hasReturnNull && !hasReturn && !hasPrintStackTrace) {
+                smells.add(new CodeSmell(
+                        "CATCH_LOG_ONLY", Severity.INFO,
+                        "Catch block only logs — caller unaware of failure",
+                        line, methodName, className));
+            }
+
+            // Only flag silent patterns if there's NO real handling
             if (!hasRealHandling) {
                 if (hasContinue) {
                     smells.add(new CodeSmell(
@@ -344,5 +355,15 @@ public class CodeSmellDetector {
             }
         }
         return smells;
+    }
+
+    /**
+     * Checks if a statement is a logging call (not real error handling).
+     * Matches: logger.error(...), log.warn(...), System.err.println(...), LOG.info(...)
+     */
+    private static boolean isLoggingStatement(String stmt) {
+        String lower = stmt.toLowerCase();
+        return lower.contains("logger.") || lower.contains("log.") || lower.contains("log4j")
+                || lower.contains("system.err.println") || lower.contains("system.out.println");
     }
 }

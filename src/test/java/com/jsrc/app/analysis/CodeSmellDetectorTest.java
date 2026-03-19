@@ -577,8 +577,8 @@ class CodeSmellDetectorTest {
     }
 
     @Test
-    @DisplayName("Should NOT flag catch with logging")
-    void shouldNotFlagCatchWithLogging() throws IOException {
+    @DisplayName("Should flag catch with ONLY logging as INFO")
+    void shouldFlagCatchWithOnlyLogging() throws IOException {
         Path file = writeFile("LoggingCatch.java", """
                 public class LoggingCatch {
                     public void run() {
@@ -591,11 +591,34 @@ class CodeSmellDetectorTest {
                 }
                 """);
         var smells = parser.detectSmells(file);
+        assertTrue(smells.stream().anyMatch(s -> s.ruleId().equals("CATCH_LOG_ONLY")),
+                "Catch with only logging should be flagged as CATCH_LOG_ONLY. Got: " + smells);
+        // Should NOT be flagged as empty or printStackTrace
         assertTrue(smells.stream().noneMatch(s ->
                         s.ruleId().equals("EMPTY_CATCH_BLOCK")
-                                || s.ruleId().equals("SILENT_CATCH_CONTINUE")
-                                || s.ruleId().equals("SILENT_CATCH_RETURN_NULL")
                                 || s.ruleId().equals("CATCH_PRINT_STACKTRACE")),
-                "Catch with logging should not be flagged as silent");
+                "Should not be flagged as empty or printStackTrace");
+    }
+
+    @Test
+    @DisplayName("Should NOT flag catch with logging + rethrow")
+    void shouldNotFlagCatchWithLoggingAndRethrow() throws IOException {
+        Path file = writeFile("LogRethrow.java", """
+                public class LogRethrow {
+                    public void run() {
+                        try {
+                            Thread.sleep(100);
+                        } catch (InterruptedException e) {
+                            System.err.println("Failed: " + e.getMessage());
+                            throw new RuntimeException(e);
+                        }
+                    }
+                }
+                """);
+        var smells = parser.detectSmells(file);
+        assertTrue(smells.stream().noneMatch(s ->
+                        s.ruleId().equals("CATCH_LOG_ONLY")
+                                || s.ruleId().equals("CATCH_PRINT_STACKTRACE")),
+                "Log + rethrow = real handling, not silent. Got: " + smells);
     }
 }
