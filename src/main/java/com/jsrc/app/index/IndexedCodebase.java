@@ -354,10 +354,14 @@ public class IndexedCodebase {
 
         String superClass = ic.superClass().isEmpty() ? "" : ic.superClass().getFirst();
 
+        List<com.jsrc.app.parser.model.FieldInfo> fields = ic.fields().stream()
+                .map(f -> new com.jsrc.app.parser.model.FieldInfo(f.name(), f.type()))
+                .toList();
+
         return new ClassInfo(
                 ic.name(), ic.packageName(), ic.startLine(), ic.endLine(),
                 List.of(), methods, superClass,
-                ic.interfaces(), annotations, ic.isInterface());
+                ic.interfaces(), annotations, ic.isInterface(), fields);
     }
 
     private static MethodInfo toMethodInfo(IndexedMethod im, String className) {
