@@ -207,6 +207,95 @@ All JSON output is compact (no pretty-print) to minimize tokens.
 
 Without index, full-parse commands on 8,323 files take 12+ minutes.
 
+## Playbooks — What command to use when
+
+### Decision tree
+
+```
+What do you need to do?
+│
+├─ FIX A BUG (have stacktrace/error)
+│  1. jsrc --read Class.method --json     ← read the failing method
+│  2. jsrc --mini Class --json            ← understand the class (compact)
+│  3. jsrc --impact Class.method --json   ← who else is affected?
+│  4. jsrc --validate Class.fix --json    ← verify fix before writing
+│
+├─ ADD/EXTEND A FEATURE
+│  1. jsrc --scope "keywords" --json      ← find WHERE the feature lives
+│  2. jsrc --mini TopMatch --json         ← understand the class (compact)
+│  3. jsrc --read Class.existingMethod --json  ← see the PATTERN to follow
+│  4. jsrc --related Class --json         ← what else to read?
+│  5. jsrc --checklist Class.method --json ← plan the change
+│  6. jsrc --validate Class.newMethod --json  ← verify names before writing
+│
+├─ UNDERSTAND A CODEBASE (new to you)
+│  1. jsrc --overview --json              ← how big? how many packages?
+│  2. jsrc --classes --json               ← list all types
+│  3. jsrc --scope "keyword" --json       ← find area of interest
+│  4. jsrc --mini Class --json            ← quick summary of key classes
+│  5. jsrc --related Class --json         ← explore neighborhood
+│
+├─ REVIEW/AUDIT CODE
+│  1. jsrc --smells Class --json          ← code smells
+│  2. jsrc --deps Class --json            ← dependency analysis
+│  3. jsrc --hierarchy Class --json       ← inheritance tree
+│  4. jsrc --check --json                 ← architecture rule violations
+│
+├─ CHANGE A METHOD SIGNATURE
+│  1. jsrc --impact Class.method --json   ← how many callers?
+│  2. jsrc --callers Class.method --json  ← exact caller list
+│  3. jsrc --checklist Class.method --json ← step-by-step plan
+│
+└─ VERIFY BEFORE WRITING CODE
+   1. jsrc --validate Class.method --json ← does it exist?
+   2. jsrc --type-check Class.method --json ← return type correct?
+```
+
+### Token budget guide (for small models)
+
+| Model size | Budget | Strategy |
+|------------|--------|----------|
+| 4K tokens  | ~2,800 usable | Use --mini (not --summary), --read method (not class), max 4-5 calls |
+| 8K tokens  | ~5,600 usable | Can use --summary for 1-2 classes, --related for context |
+| 16K+ tokens | ~11K+ usable | Full flexibility, can --read classes, use --context |
+
+### Rules for small models (≤8K)
+
+1. **NEVER `cat` a Java file** — use `jsrc --read Class.method` for specific methods
+2. **NEVER `jsrc --summary`** on large classes — use `jsrc --mini` instead (10× smaller)
+3. **NEVER `jsrc --context`** — too expensive. Use --mini + --read method
+4. **ALWAYS start with --scope** when you don't know where code is
+5. **ALWAYS --validate** method names before generating code
+6. **Read methods, not classes** — `--read Class.method` not `--read Class`
+
+## AI Agent Commands (new)
+
+Commands designed specifically for AI agent workflows:
+
+```bash
+# Anti-hallucination: verify method exists, suggest closest if not
+jsrc --validate Class.method --json
+jsrc --validate Class.method(Type1,Type2) --json
+
+# Ultra-compact summary (<500 chars) for small context windows
+jsrc --mini ClassName --json
+
+# Related classes ranked by coupling score
+jsrc --related ClassName --json
+
+# Change impact: transitive callers + risk level
+jsrc --impact Class.method --json
+
+# Task planner: find relevant classes by keywords
+jsrc --scope "keyword1 keyword2" --json
+
+# Step-by-step change guide
+jsrc --checklist Class.method --json
+
+# Return type verification
+jsrc --type-check Class.method --json
+```
+
 ## Configuration (.jsrc.yaml)
 
 Optional. Place in project root:
