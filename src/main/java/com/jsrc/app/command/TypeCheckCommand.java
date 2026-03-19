@@ -72,6 +72,23 @@ public class TypeCheckCommand implements Command {
         if (foundClass == null) {
             result.put("valid", false);
             result.put("error", "Method not found: " + expression);
+            // Suggest closest method in the target class
+            if (className != null && ctx.indexed() != null) {
+                var closest = new java.util.ArrayList<String>();
+                for (var entry : ctx.indexed().getEntries()) {
+                    for (var ic : entry.classes()) {
+                        if (!ic.name().equals(className)) continue;
+                        for (var im : ic.methods()) {
+                            int dist = ValidateCommand.levenshtein(
+                                    methodName.toLowerCase(), im.name().toLowerCase());
+                            if (dist <= 3) {
+                                closest.add(ic.name() + "." + im.signature());
+                            }
+                        }
+                    }
+                }
+                if (!closest.isEmpty()) result.put("closest", closest);
+            }
             ctx.formatter().printResult(result);
             return 0;
         }

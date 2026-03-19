@@ -65,6 +65,40 @@ class TypeCheckCommandTest {
         assertNotNull(result.get("signature"));
     }
 
+    @Test
+    void methodNotFound_withSuggestion() throws Exception {
+        var result = run("Svc.proces", """
+                public class Svc {
+                    public void process() {}
+                }
+                """);
+        assertEquals(false, result.get("valid"));
+        // Should suggest closest method
+        assertNotNull(result.get("closest"), "Should suggest closest method. Got: " + result);
+    }
+
+    @Test
+    void primitiveReturnType_identified() throws Exception {
+        var result = run("Svc.getCount", """
+                public class Svc {
+                    public int getCount() { return 0; }
+                }
+                """);
+        assertEquals(true, result.get("valid"));
+        assertEquals("int", result.get("returnType"));
+    }
+
+    @Test
+    void booleanReturnType_noVoidWarning() throws Exception {
+        var result = run("Svc.isActive", """
+                public class Svc {
+                    public boolean isActive() { return true; }
+                }
+                """);
+        assertEquals(true, result.get("valid"));
+        assertNull(result.get("warning"), "Non-void should not have warning");
+    }
+
     // --- helpers ---
 
     @SuppressWarnings("unchecked")
