@@ -448,4 +448,88 @@ class CodeSmellDetectorTest {
         Files.writeString(file, content);
         return file;
     }
+
+    // ---- Silent failure detection ----
+
+    @Test
+    @DisplayName("Should detect catch with only continue")
+    void shouldDetectCatchContinue() throws IOException {
+        Path file = writeFile("ContinueCatch.java", """
+                public class ContinueCatch {
+                    public void process(java.util.List<String> items) {
+                        for (String item : items) {
+                            try {
+                                Integer.parseInt(item);
+                            } catch (NumberFormatException e) {
+                                continue;
+                            }
+                        }
+                    }
+                }
+                """);
+        var smells = parser.detectSmells(file);
+        assertTrue(smells.stream().anyMatch(s -> s.ruleId().equals("SILENT_CATCH_CONTINUE")),
+                "Should detect catch with only continue. Got: " + smells);
+    }
+
+    @Test
+    @DisplayName("Should detect catch with return null")
+    void shouldDetectCatchReturnNull() throws IOException {
+        Path file = writeFile("ReturnNullCatch.java", """
+                public class ReturnNullCatch {
+                    public String load(String path) {
+                        try {
+                            return new String("data");
+                        } catch (Exception e) {
+                            return null;
+                        }
+                    }
+                }
+                """);
+        var smells = parser.detectSmells(file);
+        assertTrue(smells.stream().anyMatch(s -> s.ruleId().equals("SILENT_CATCH_RETURN_NULL")),
+                "Should detect catch returning null. Got: " + smells);
+    }
+
+    @Test
+    @DisplayName("Should detect catch with only printStackTrace")
+    void shouldDetectPrintStackTrace() throws IOException {
+        Path file = writeFile("PrintStackCatch.java", """
+                public class PrintStackCatch {
+                    public void run() {
+                        try {
+                            Thread.sleep(100);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+                """);
+        var smells = parser.detectSmells(file);
+        assertTrue(smells.stream().anyMatch(s -> s.ruleId().equals("CATCH_PRINT_STACKTRACE")),
+                "Should detect printStackTrace. Got: " + smells);
+    }
+
+    @Test
+    @DisplayName("Should NOT flag catch with logging")
+    void shouldNotFlagCatchWithLogging() throws IOException {
+        Path file = writeFile("LoggingCatch.java", """
+                public class LoggingCatch {
+                    public void run() {
+                        try {
+                            Thread.sleep(100);
+                        } catch (InterruptedException e) {
+                            System.err.println("Interrupted: " + e.getMessage());
+                        }
+                    }
+                }
+                """);
+        var smells = parser.detectSmells(file);
+        assertTrue(smells.stream().noneMatch(s ->
+                        s.ruleId().equals("EMPTY_CATCH_BLOCK")
+                                || s.ruleId().equals("SILENT_CATCH_CONTINUE")
+                                || s.ruleId().equals("SILENT_CATCH_RETURN_NULL")
+                                || s.ruleId().equals("CATCH_PRINT_STACKTRACE")),
+                "Catch with logging should not be flagged as silent");
+    }
 }

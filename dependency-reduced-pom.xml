@@ -20,6 +20,8 @@
         <version>3.5.5</version>
         <configuration>
           <argLine>-Djava.library.path=/home/joaquin/lib --enable-native-access=ALL-UNNAMED</argLine>
+          <groups>${test.groups}</groups>
+          <excludedGroups>${test.excludedGroups}</excludedGroups>
         </configuration>
       </plugin>
       <plugin>
@@ -75,8 +77,8 @@
     </dependency>
   </dependencies>
   <properties>
-    <maven.compiler.target>22</maven.compiler.target>
     <maven.compiler.source>22</maven.compiler.source>
+    <maven.compiler.target>22</maven.compiler.target>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <junit.version>6.0.3</junit.version>
     <jdk.version>22</jdk.version>
