@@ -231,87 +231,128 @@ public class App {
 
     private static void printHelp() {
         System.out.println("""
-                jsrc — Java Source Code Navigator
+                jsrc — Java Source Code Navigator for AI Agents & Humans
 
                 Usage: jsrc [source-root] <command> [args] [flags]
 
-                Discovery:
-                  --overview                Codebase overview: files, classes, methods, packages
+                FIRST RUN: jsrc --index  (builds persistent index, one-time)
+
+                ── Discovery ──────────────────────────────────────────────
+                  --overview                Codebase stats: files, classes, methods, packages
                   --classes                 List all classes, interfaces, enums, records
                   --packages                Package map with inter-package dependencies
                   --search <pattern>        Structured text search with class/method context
+                  --find <description>      Semantic search using Java concept synonyms
+                                            "database errors" → finds DataSourceExceptionHandler
+                  --scope <keywords>        Find relevant classes for a task (multi-word)
+                                            Ranks by keyword match, estimates token cost
+                  --map                     Token-budget repo map ranked by class importance
                   <methodName>              Search for methods by name
 
-                Analysis:
-                  --summary <class>         Compact class summary with method signatures
-                  --deps <class>            Class dependencies: imports, fields, params
+                ── Class Analysis ─────────────────────────────────────────
+                  --summary <class>         Class summary with method signatures
+                  --mini <class>            Ultra-compact summary (<500 chars, ~120 tokens)
+                                            Top-5 methods by callers, abbreviated package
+                  --deps <class>            Dependencies: imports, fields, constructor params
                   --hierarchy <class>       Extends, implements, subclasses
-                  --implements <iface>      Find all implementors of an interface
-                  --annotations <name>      Find classes/methods with annotation
-                  --smells <class|--all>    Detect code smells (class or --all)
+                  --implements <iface>      All implementors of an interface
+                  --annotations <name>      Classes/methods with annotation
+                  --related <class>         Related classes ranked by coupling score
+                  --smells <class|--all>    Code smell detection (9 rules)
                   --stats <class>           Code metrics: LOC, complexity, coupling
                   --explain <class>         Concise actionable summary
-                  --similar <class>         Find structurally similar classes
-                  --unused                  Detect dead code
+                  --similar <class>         Structurally similar classes
+                  --unused                  Dead code detection
 
-                Call Graph:
-                  --callers <method>        Find all callers of a method
-                  --callees <method>        Find all callees of a method
-                  --call-chain <method> [outdir]  Trace call chains, generate Mermaid diagrams
+                ── Call Graph ─────────────────────────────────────────────
+                  --callers <method>        Who calls this method?
+                  --callees <method>        What does this method call?
+                  --call-chain <method>     Full call chains + Mermaid diagrams
+                  --impact <method>         Change impact: callers, transitive, risk level
+                                            "Binder.bind → 15 direct, 29 transitive, risk=HIGH"
 
-                Architecture:
-                  --check [ruleId]          Check architecture rules
-                  --layer <name>            List classes in a layer
-                  --endpoints               List REST endpoints
-                  --drift                   Combined architecture + spec check
-                  --verify <class> --spec <md>  Verify against spec
+                ── AI Agent Tools ─────────────────────────────────────────
+                  --validate <method>       Anti-hallucination: verify method exists
+                                            Suggests closest match for typos/wrong names
+                  --type-check <method>     Return type verification from index
+                  --context-for <task>      Auto-plan: what jsrc commands to run (multi-word)
+                                            "fix NPE in OrderService.validate" → 4-step plan
+                  --checklist <method>      Step-by-step change guide with callers
+                  --lint <class>            Pre-compile diagnostics: unknown types, dead code
+                  --resolve <expr>          Resolve receiver type from context class fields
+                                            "Controller.service.process" → service is OrderService
 
-                Source:
-                  --read <Class[.method]>   Read source code
+                ── Code Generation ────────────────────────────────────────
+                  --style                   Project conventions in <300 chars (~75 tokens)
+                                            logging, injection, naming, nulls, collections
+                  --patterns                Deep convention analysis: frequencies, layer chains
+                                            Auto-discovers naming patterns (Detail→Bean→DAO)
+                  --snippet <pattern>       Code template from real codebase class
+                                            service, repository, controller, config, handler...
+
+                ── Architecture ───────────────────────────────────────────
+                  --check [ruleId]          Architecture rule violations
+                  --layer <name>            Classes in an architectural layer
+                  --endpoints               REST endpoints (path, method, controller)
+                  --drift                   Architecture + spec drift detection
+                  --verify <class> --spec   Verify implementation vs Markdown spec
+
+                ── Source ─────────────────────────────────────────────────
+                  --read <Class[.method]>   Read source code (method-level precision)
                   --context <class>         Full context package for reverse engineering
-                  --contract <class>        Extract formal contract
-                  --imports <class>         Find all classes that import a class
+                  --contract <class>        Extract formal interface contract
+                  --imports <class>         Who imports this class (impact analysis)
 
-                Git:
+                ── Git ────────────────────────────────────────────────────
                   --changed                 Java files changed (vs HEAD)
                   --diff                    Files changed since last index
                   --history <class>         Git history for a class
 
-                Index:
-                  --index                   Build/update persistent codebase index
+                ── Index ──────────────────────────────────────────────────
+                  --index                   Build/update persistent index
+                                            Incremental: only re-parses changed files
 
-                Advanced:
-                  --batch                   Execute multiple queries from stdin
-                  --watch                   Daemon mode: serve via stdin JSON
+                ── Advanced ───────────────────────────────────────────────
+                  --batch                   Multiple queries from stdin (JSON array)
+                  --watch                   Daemon mode: stdin/stdout JSON protocol
                   --describe [cmd] --json   Machine-readable command metadata
 
-                Global Flags:
-                  --json                    JSON output
-                  --md                      Markdown output (some commands)
-                  --fields <f1,f2>          Filter output fields
+                ── Flags ──────────────────────────────────────────────────
+                  --json                    JSON output (always use for agents)
+                  --md                      Markdown output (--context)
+                  --fields <f1,f2>          Filter output fields (saves tokens)
                   --signature-only          Method signatures only
-                  --metrics                 Show execution metrics
-                  --config <path>           Use specific config file
+                  --metrics                 Execution metrics on stderr
+                  --config <path>           Use specific .jsrc.yaml
 
-                Method References (for <method> arguments):
+                ── Method References ──────────────────────────────────────
                   methodName                    All methods with that name
                   Class.method                  Specific class
-                  pkg.Class.method              Qualified name (resolved to simple)
                   Class.method(Type1,Type2)     Specific overload
-                  Class.method(HashMap<K,V>)    Generics stripped automatically
+                  Generics stripped automatically (HashMap<K,V> → HashMap)
+                  Ambiguous? Returns candidates list for disambiguation.
 
-                  If ambiguous, returns candidates list for disambiguation.
+                ── Workflows for Agents ───────────────────────────────────
+                  Fix bug:     --read method → --mini class → --impact → --validate fix
+                  Add feature: --scope keywords → --style → --snippet → --checklist
+                  Understand:  --overview → --map → --mini class → --related
+                  Change sig:  --impact method → --callers → --checklist
 
-                Examples:
-                  jsrc src/main/java --overview --json
-                  jsrc --classes --fields name,packageName --json
-                  jsrc --callers processOrder --json
-                  jsrc --callers Service.processOrder --json
-                  jsrc --smells OrderService
-                  jsrc --smells --all --json
-                  jsrc --call-chain DocumentoXML.creaDocumento ./output --metrics
-                  jsrc --search _initMethod --json
-                  jsrc --index                        # re-index after code changes
+                ── Examples ───────────────────────────────────────────────
+                  jsrc --index
+                  jsrc --overview --json
+                  jsrc --mini SpringApplication --json
+                  jsrc --validate Binder.bind --json
+                  jsrc --impact Binder.bind --json
+                  jsrc --find database errors --json
+                  jsrc --context-for fix NPE in OrderService.validate --json
+                  jsrc --style --json
+                  jsrc --patterns --json
+                  jsrc --snippet service --json
+                  jsrc --scope kafka --json
+                  jsrc --map --json
+                  jsrc --related Binder --json
+                  jsrc --lint SpringApplication --json
                 """);
     }
 
