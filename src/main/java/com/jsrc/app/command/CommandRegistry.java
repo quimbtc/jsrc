@@ -104,7 +104,13 @@ public final class CommandRegistry {
             new CommandDef("--checklist", "Step-by-step change guide for a method modification",
                     List.of("<Class.method>"), List.of("--json"), "object"),
             new CommandDef("--type-check", "Verify method exists and check return type",
-                    List.of("<Class.method>"), List.of("--json"), "object")
+                    List.of("<Class.method>"), List.of("--json"), "object"),
+            new CommandDef("--style", "Ultra-compact code style guide (<300 chars)",
+                    List.of(), List.of("--json"), "object"),
+            new CommandDef("--patterns", "Deep analysis of codebase conventions and patterns",
+                    List.of(), List.of("--json"), "object"),
+            new CommandDef("--snippet", "Extract code template from real codebase class",
+                    List.of("<pattern>"), List.of("--json"), "object")
     );
 
     /**
