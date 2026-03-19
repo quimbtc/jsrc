@@ -53,6 +53,7 @@ public final class CommandFactory {
             case "--validate" -> arg != null ? new ValidateCommand(arg) : null;
             case "--mini" -> arg != null ? new MiniCommand(arg) : null;
             case "--related" -> arg != null ? new RelatedCommand(arg) : null;
+            case "--impact" -> arg != null ? new ImpactCommand(arg) : null;
             default -> null;
         };
     }
