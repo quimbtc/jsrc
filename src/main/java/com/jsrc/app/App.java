@@ -145,6 +145,13 @@ public class App {
             return new CallChainCommand(method, outDir);
         }
 
+        // Commands that accept free-text (multi-word) arguments
+        var textCommands = List.of("--find", "--context-for", "--scope");
+        if (textCommands.contains(command)) {
+            String textArg = extractTextArg(argList, command);
+            return CommandFactory.create(command, textArg, mdOutput);
+        }
+
         // Extract arg (next token after command)
         String arg = extractArg(argList, command);
 
@@ -168,6 +175,23 @@ public class App {
         if (!command.startsWith("--")) return CommandFactory.createMethodSearch(command);
 
         throw new BadUsageException("Unknown command: " + command);
+    }
+
+    /**
+     * Extracts a multi-word argument: all tokens after the command until the next --flag.
+     * E.g. --find database connection errors --json → "database connection errors"
+     */
+    private static String extractTextArg(List<String> argList, String command) {
+        int cmdIdx = argList.indexOf(command);
+        if (cmdIdx < 0 || cmdIdx + 1 >= argList.size()) return null;
+        StringBuilder sb = new StringBuilder();
+        for (int i = cmdIdx + 1; i < argList.size(); i++) {
+            String token = argList.get(i);
+            if (token.startsWith("--")) break;
+            if (!sb.isEmpty()) sb.append(' ');
+            sb.append(token);
+        }
+        return sb.isEmpty() ? null : sb.toString();
     }
 
     private static String extractArg(List<String> argList, String command) {
