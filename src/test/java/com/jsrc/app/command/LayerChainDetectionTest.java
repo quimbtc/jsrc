@@ -37,6 +37,56 @@ class LayerChainDetectionTest {
         assertNull(PatternsCommand.extractSuffix("App")); // single word
     }
 
+    // --- Edge cases from Rune's review ---
+
+    @Test
+    void extractSuffix_uppercasePrefixThenCamelCase() {
+        // XMLParser → should extract "Parser", not get confused by XML uppercase run
+        String result = PatternsCommand.extractSuffix("XMLParser");
+        assertEquals("Parser", result, "Should handle uppercase prefix");
+
+        result = PatternsCommand.extractSuffix("HTMLRenderer");
+        assertEquals("Renderer", result, "Should handle uppercase prefix");
+    }
+
+    @Test
+    void extractSuffix_shortBaseWithUppercaseSuffix() {
+        assertEquals("DAO", PatternsCommand.extractSuffix("MyDAO"));
+    }
+
+    @Test
+    void extractSuffix_entireNameIsSuffix() {
+        // "DAO" alone — no base name, should return null
+        assertNull(PatternsCommand.extractSuffix("DAO"), "Whole name = suffix → null");
+        assertNull(PatternsCommand.extractSuffix("SERVICE"), "All uppercase → null");
+    }
+
+    @Test
+    void extractSuffix_allLowercase() {
+        assertNull(PatternsCommand.extractSuffix("service"), "All lowercase → null");
+    }
+
+    @Test
+    void extractSuffix_withNumbers() {
+        String result = PatternsCommand.extractSuffix("OAuth2Handler");
+        assertEquals("Handler", result, "Should handle numbers in name");
+    }
+
+    @Test
+    void extractSuffix_trivialInputs() {
+        assertNull(PatternsCommand.extractSuffix("A"));
+        assertNull(PatternsCommand.extractSuffix(""));
+        assertNull(PatternsCommand.extractSuffix(null));
+    }
+
+    @Test
+    void extractSuffix_serviceImpl() {
+        String result = PatternsCommand.extractSuffix("OrderServiceImpl");
+        // Should extract "ServiceImpl" or "Impl" — either is valid
+        assertNotNull(result);
+        assertTrue(result.contains("Impl"), "Should include Impl. Got: " + result);
+    }
+
     @Test
     void patterns_discoversCustomSuffixes() throws Exception {
         var result = runPatterns(

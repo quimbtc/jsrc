@@ -215,59 +215,67 @@ public class PatternsCommand implements Command {
      * E.g.: "FacturaDetailBean" → "DetailBean", "OrderService" → "Service",
      * "FacturaDAO" → "DAO", "App" → null (single word).
      */
+    /**
+     * Extracts the suffix from a class name by finding camelCase word boundaries.
+     * <p>
+     * Examples: OrderService→Service, FacturaDetailBean→DetailBean,
+     * FacturaDAO→DAO, XMLParser→Parser, OAuth2Handler→Handler
+     *
+     * @return suffix, or null if the name is a single word / trivial
+     */
     static String extractSuffix(String className) {
         if (className == null || className.length() <= 1) return null;
 
-        // Find the last uppercase sequence that starts a "word"
-        // Walk from the end, find where the suffix begins
-        int suffixStart = -1;
-
-        for (int i = className.length() - 1; i > 0; i--) {
+        // Find all word boundary positions (where a new "word" starts)
+        List<Integer> boundaries = new java.util.ArrayList<>();
+        for (int i = 1; i < className.length(); i++) {
             char c = className.charAt(i);
             char prev = className.charAt(i - 1);
 
-            // Transition from lowercase to uppercase = word boundary
+            // lowercase→Uppercase: "order|Service"
             if (Character.isUpperCase(c) && Character.isLowerCase(prev)) {
-                suffixStart = i;
-                break;
+                boundaries.add(i);
             }
-            // All-uppercase suffix like "DAO" — find its start
-            if (Character.isUpperCase(c) && Character.isUpperCase(prev)) {
-                // Keep going back to find start of uppercase run
-                int j = i - 1;
-                while (j > 0 && Character.isUpperCase(className.charAt(j))) j--;
-                if (j > 0) { // Don't take the whole name
-                    suffixStart = j + 1;
-                    break;
+            // Uppercase→lowercase after uppercase run: "XML|Parser" (boundary at P)
+            else if (Character.isLowerCase(c) && Character.isUpperCase(prev) && i >= 2
+                    && Character.isUpperCase(className.charAt(i - 2))) {
+                boundaries.add(i - 1);
+            }
+            // digit→letter or letter→digit: "OAuth|2|Handler"
+            else if (Character.isDigit(c) != Character.isDigit(prev)
+                    && Character.isUpperCase(c)) {
+                boundaries.add(i);
+            }
+        }
+
+        if (boundaries.isEmpty()) return null;
+
+        // Last word = simple suffix (Service, Parser, DAO, Handler)
+        int lastBoundary = boundaries.getLast();
+        String simpleSuffix = className.substring(lastBoundary);
+        if (simpleSuffix.length() < 2) return null;
+
+        // If the whole name is the suffix, return null
+        if (lastBoundary == 0) return null;
+
+        // Try compound suffix: include the word before the last one
+        // "FacturaDetailBean" → boundaries at [7=Detail, 13=Bean] → compound = "DetailBean"
+        // Don't compound across digits: "OAuth2Handler" → just "Handler"
+        if (boundaries.size() >= 2) {
+            int secondLast = boundaries.get(boundaries.size() - 2);
+            if (secondLast > 0) {
+                String between = className.substring(secondLast, lastBoundary);
+                // Only compound if the segment between boundaries is pure letters
+                if (between.chars().allMatch(Character::isLetter)) {
+                    String compound = className.substring(secondLast);
+                    if (compound.length() <= 20) {
+                        return compound;
+                    }
                 }
             }
         }
 
-        if (suffixStart <= 0 || suffixStart >= className.length()) return null;
-
-        String suffix = className.substring(suffixStart);
-        // Skip very short suffixes (likely not a pattern)
-        if (suffix.length() < 2) return null;
-
-        // Handle compound suffixes: "DetailBean" — check if the char before suffixStart
-        // is also an uppercase transition
-        for (int i = suffixStart - 1; i > 0; i--) {
-            char c = className.charAt(i);
-            char prev = className.charAt(i - 1);
-            if (Character.isUpperCase(c) && Character.isLowerCase(prev)) {
-                // This could be a compound suffix — include it
-                String extended = className.substring(i);
-                // Only extend if the resulting suffix appears elsewhere in the name structure
-                // Heuristic: if extending gives us something ≤20 chars, use it
-                if (extended.length() <= 20) {
-                    suffix = extended;
-                    suffixStart = i;
-                }
-                break;
-            }
-        }
-
-        return suffix;
+        return simpleSuffix;
     }
 
     private String percent(int count, int total) {
