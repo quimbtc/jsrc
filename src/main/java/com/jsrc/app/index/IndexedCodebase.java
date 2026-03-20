@@ -369,11 +369,55 @@ public class IndexedCodebase {
                 .map(AnnotationInfo::marker)
                 .toList();
 
+        // Use the stored signature directly (params are not parsed back from index)
+        // Override signature() by passing the indexed signature as the content field
+        // and parsing params from the signature string
+        var params = parseParamsFromSignature(im.signature());
+
         return new MethodInfo(
                 im.name(), className, im.startLine(), im.endLine(),
-                im.returnType(), List.of(), List.of(),
+                im.returnType(), List.of(), params,
                 "", // no content from index
                 annotations, List.of(), List.of(), null);
+    }
+
+    /**
+     * Extracts parameter info from a signature string.
+     * E.g. "public BindResult<T> bind(String name, Class<T> target)" → [String name, Class<T> target]
+     */
+    private static List<com.jsrc.app.parser.model.MethodInfo.ParameterInfo> parseParamsFromSignature(String sig) {
+        if (sig == null || !sig.contains("(")) return List.of();
+        int open = sig.indexOf('(');
+        int close = sig.lastIndexOf(')');
+        if (close <= open + 1) return List.of();
+        String paramStr = sig.substring(open + 1, close).trim();
+        if (paramStr.isEmpty()) return List.of();
+
+        var result = new ArrayList<com.jsrc.app.parser.model.MethodInfo.ParameterInfo>();
+        // Split by comma, but respect generics: "Map<K,V> map, String name"
+        int depth = 0;
+        int start = 0;
+        for (int i = 0; i < paramStr.length(); i++) {
+            char c = paramStr.charAt(i);
+            if (c == '<') depth++;
+            else if (c == '>') depth--;
+            else if (c == ',' && depth == 0) {
+                addParam(result, paramStr.substring(start, i).trim());
+                start = i + 1;
+            }
+        }
+        addParam(result, paramStr.substring(start).trim());
+        return result;
+    }
+
+    private static void addParam(List<com.jsrc.app.parser.model.MethodInfo.ParameterInfo> list, String param) {
+        if (param.isEmpty()) return;
+        int lastSpace = param.lastIndexOf(' ');
+        if (lastSpace > 0) {
+            list.add(new com.jsrc.app.parser.model.MethodInfo.ParameterInfo(
+                    param.substring(0, lastSpace).trim(),
+                    param.substring(lastSpace + 1).trim()));
+        }
     }
 
     private static IndexedClass classInfoToIndexed(ClassInfo ci) {
