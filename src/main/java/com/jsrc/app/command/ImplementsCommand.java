@@ -16,7 +16,10 @@ public class ImplementsCommand implements Command {
     public int execute(CommandContext ctx) {
         var allClasses = ctx.getAllClasses();
         List<String> implementors = allClasses.stream()
-                .filter(ci -> ci.interfaces().contains(ifaceName))
+                .filter(ci -> ci.interfaces().stream().anyMatch(i -> {
+                    String stripped = i.contains("<") ? i.substring(0, i.indexOf('<')) : i;
+                    return stripped.equals(ifaceName);
+                }))
                 .map(ClassInfo::qualifiedName).toList();
 
         ctx.formatter().printHierarchy(new HierarchyResult(

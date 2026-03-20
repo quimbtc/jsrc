@@ -25,8 +25,8 @@ public class HierarchyCommand implements Command {
 
         List<String> implementors = target.isInterface()
                 ? allClasses.stream()
-                        .filter(ci -> ci.interfaces().contains(target.name())
-                                || ci.interfaces().contains(target.qualifiedName()))
+                        .filter(ci -> ci.interfaces().stream().anyMatch(i -> { String s = i.contains("<") ? i.substring(0, i.indexOf("<")) : i; return s.equals(target.name()); })
+                                || ci.interfaces().stream().anyMatch(i -> { String s = i.contains("<") ? i.substring(0, i.indexOf("<")) : i; return s.equals(target.qualifiedName()); }))
                         .map(ClassInfo::qualifiedName).toList()
                 : List.of();
 

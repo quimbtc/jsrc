@@ -63,8 +63,8 @@ public class UnusedCommand implements Command {
         List<String> unimplemented = allClasses.stream()
                 .filter(ClassInfo::isInterface)
                 .filter(iface -> allClasses.stream().noneMatch(ci ->
-                        ci.interfaces().contains(iface.name())
-                                || ci.interfaces().contains(iface.qualifiedName())))
+                        ci.interfaces().stream().anyMatch(i -> { String s = i.contains("<") ? i.substring(0, i.indexOf("<")) : i; return s.equals(iface.name()); })
+                                || ci.interfaces().stream().anyMatch(i -> { String s = i.contains("<") ? i.substring(0, i.indexOf("<")) : i; return s.equals(iface.qualifiedName()); })))
                 .map(ClassInfo::qualifiedName)
                 .toList();
 

@@ -37,11 +37,14 @@ public class BreakingChangesCommand implements Command {
                 .map(ci -> ctx.qualify(ci.name()))
                 .toList();
 
-        // Implementors (if target is interface)
+        // Implementors (if target is interface) — strip generics for matching
         List<String> implementors = List.of();
         if (target.isInterface()) {
             implementors = allClasses.stream()
-                    .filter(ci -> ci.interfaces().contains(target.name()) || ci.interfaces().contains(target.qualifiedName()))
+                    .filter(ci -> ci.interfaces().stream().anyMatch(iface -> {
+                        String stripped = iface.contains("<") ? iface.substring(0, iface.indexOf('<')) : iface;
+                        return stripped.equals(target.name()) || stripped.equals(target.qualifiedName());
+                    }))
                     .map(ci -> ctx.qualify(ci.name()))
                     .toList();
         }
@@ -51,8 +54,12 @@ public class BreakingChangesCommand implements Command {
         for (var method : target.methods()) {
             List<String> overriddenBy = new ArrayList<>();
             for (var sub : allClasses) {
-                if (!sub.superClass().equals(target.name()) && !sub.superClass().equals(target.qualifiedName())
-                        && !sub.interfaces().contains(target.name()) && !sub.interfaces().contains(target.qualifiedName()))
+                boolean isChild = sub.superClass().equals(target.name()) || sub.superClass().equals(target.qualifiedName());
+                boolean isImpl = sub.interfaces().stream().anyMatch(iface -> {
+                    String stripped = iface.contains("<") ? iface.substring(0, iface.indexOf('<')) : iface;
+                    return stripped.equals(target.name()) || stripped.equals(target.qualifiedName());
+                });
+                if (!isChild && !isImpl)
                     continue;
                 if (sub.methods().stream().anyMatch(m -> m.name().equals(method.name()))) {
                     overriddenBy.add(ctx.qualify(sub.name()) + "." + method.name());

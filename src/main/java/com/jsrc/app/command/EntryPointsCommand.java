@@ -86,7 +86,7 @@ public class EntryPointsCommand implements Command {
                 }
             }
 
-            // Listeners
+            // Listeners — by annotation
             for (var m : ci.methods()) {
                 boolean isListener = m.annotations().stream()
                         .anyMatch(a -> LISTENER_ANNOTATIONS.contains(a.name()));
@@ -100,6 +100,29 @@ public class EntryPointsCommand implements Command {
                             .findFirst()
                             .ifPresent(a -> ep.put("annotation", "@" + a.name()));
                     entryPoints.add(ep);
+                }
+            }
+
+            // Listeners — by implements XxxListener interface
+            boolean implementsListener = ci.interfaces().stream()
+                    .anyMatch(iface -> {
+                        String stripped = iface.contains("<") ? iface.substring(0, iface.indexOf('<')) : iface;
+                        return stripped.endsWith("Listener");
+                    });
+            if (implementsListener && !isRestController) {
+                // Find handler methods (typically onXxx, handleXxx, or interface method implementations)
+                for (var m : ci.methods()) {
+                    if (m.name().startsWith("on") || m.name().startsWith("handle")
+                            || m.name().contains("Event") || m.name().contains("event")) {
+                        var ep = new LinkedHashMap<String, Object>();
+                        ep.put("type", "listener");
+                        ep.put("class", ctx.qualify(ci.name()));
+                        ep.put("method", m.name());
+                        ep.put("via", "implements " + ci.interfaces().stream()
+                                .filter(i -> i.contains("Listener"))
+                                .findFirst().orElse("Listener"));
+                        entryPoints.add(ep);
+                    }
                 }
             }
         }
