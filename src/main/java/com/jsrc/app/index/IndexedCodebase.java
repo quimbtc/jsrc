@@ -369,16 +369,15 @@ public class IndexedCodebase {
                 .map(AnnotationInfo::marker)
                 .toList();
 
-        // Use the stored signature directly (params are not parsed back from index)
-        // Override signature() by passing the indexed signature as the content field
-        // and parsing params from the signature string
         var params = parseParamsFromSignature(im.signature());
+        var thrownExceptions = parseThrowsFromSignature(im.signature());
+        var modifiers = parseModifiersFromSignature(im.signature());
 
         return new MethodInfo(
                 im.name(), className, im.startLine(), im.endLine(),
-                im.returnType(), List.of(), params,
+                im.returnType(), modifiers, params,
                 "", // no content from index
-                annotations, List.of(), List.of(), null);
+                annotations, thrownExceptions, List.of(), null);
     }
 
     /**
@@ -408,6 +407,28 @@ public class IndexedCodebase {
         }
         addParam(result, paramStr.substring(start).trim());
         return result;
+    }
+
+    private static List<String> parseThrowsFromSignature(String sig) {
+        if (sig == null || !sig.contains(" throws ")) return List.of();
+        String afterThrows = sig.substring(sig.lastIndexOf(" throws ") + 8).trim();
+        return java.util.Arrays.stream(afterThrows.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
+    }
+
+    private static List<String> parseModifiersFromSignature(String sig) {
+        if (sig == null) return List.of();
+        var mods = new ArrayList<String>();
+        String[] tokens = sig.split("\\s+");
+        for (String t : tokens) {
+            if (java.util.Set.of("public", "protected", "private", "static",
+                    "final", "abstract", "synchronized", "native", "default").contains(t)) {
+                mods.add(t);
+            } else break;
+        }
+        return mods;
     }
 
     private static void addParam(List<com.jsrc.app.parser.model.MethodInfo.ParameterInfo> list, String param) {
