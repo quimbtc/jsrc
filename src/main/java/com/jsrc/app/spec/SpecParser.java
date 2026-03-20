@@ -46,6 +46,7 @@ public class SpecParser {
         String currentMethodSig = "";
         List<String> currentThrows = new ArrayList<>();
         List<String> currentAnnotations = new ArrayList<>();
+        boolean inMethods = false;
 
         for (String line : lines) {
             String trimmed = line.trim();
@@ -56,11 +57,22 @@ public class SpecParser {
                 continue;
             }
 
-            // ### methodSignature
+            // Track sections
+            if (trimmed.startsWith("## ")) {
+                inMethods = trimmed.startsWith("## Methods");
+            }
+
+            // ### methodSignature  or  - `methodSignature`
+            String methodSig = null;
             if (trimmed.startsWith("### ")) {
+                methodSig = trimmed.substring(4).trim();
+            } else if (trimmed.startsWith("- `") && trimmed.endsWith("`") && inMethods) {
+                methodSig = trimmed.substring(3, trimmed.length() - 1).trim();
+            }
+            if (methodSig != null) {
                 // Flush previous method
                 flushMethod(methods, currentMethodSig, currentThrows, currentAnnotations);
-                currentMethodSig = trimmed.substring(4).trim();
+                currentMethodSig = methodSig;
                 currentThrows = new ArrayList<>();
                 currentAnnotations = new ArrayList<>();
                 continue;

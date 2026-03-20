@@ -65,16 +65,13 @@ public final class MarkdownFormatter {
                 int start = m.get("startLine") instanceof Number n ? n.intValue() : 0;
                 int end = m.get("endLine") instanceof Number n ? n.intValue() : 0;
 
-                // Single line: signature + throws + lines
-                StringBuilder methodLine = new StringBuilder();
-                methodLine.append(sig);
+                StringBuilder methodLine = new StringBuilder(sig);
                 if (m.containsKey("throws")) {
                     @SuppressWarnings("unchecked")
                     List<String> thrw = (List<String>) m.get("throws");
                     if (!thrw.isEmpty()) methodLine.append(" throws ").append(String.join(", ", thrw));
                 }
-                md.append("### `").append(truncate(methodLine.toString(), 100)).append("`\n\n");
-                md.append("Lines ").append(start).append("-").append(end).append("\n\n");
+                md.append("- `").append(methodLine).append("`\n");
             }
         }
 
