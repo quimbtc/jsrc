@@ -83,7 +83,7 @@ public class MiniCommand implements Command {
         String kind = ci.isInterface() ? "interface" : ci.isAbstract() ? "abstract class" : "class";
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("name", ci.name());
+        result.put("name", ci.qualifiedName());
         result.put("pkg", abbreviatePackage(ci.packageName()));
         result.put("kind", kind);
         result.put("lines", ci.endLine() - ci.startLine());

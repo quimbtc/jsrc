@@ -61,6 +61,23 @@ public final class CommandContext {
     public boolean mdOutput() { return mdOutput; }
     public String outDir() { return outDir; }
 
+    private java.util.Map<String, String> qualifiedNameCache;
+
+    /**
+     * Resolves a simple class name to its fully qualified name.
+     * Returns the input unchanged if not found in the index.
+     */
+    public String qualify(String simpleName) {
+        if (simpleName == null || simpleName.contains(".")) return simpleName;
+        if (qualifiedNameCache == null) {
+            qualifiedNameCache = new java.util.HashMap<>();
+            for (var ci : getAllClasses()) {
+                qualifiedNameCache.putIfAbsent(ci.name(), ci.qualifiedName());
+            }
+        }
+        return qualifiedNameCache.getOrDefault(simpleName, simpleName);
+    }
+
     /**
      * Returns all classes, using index if available, parsing on-the-fly otherwise.
      */

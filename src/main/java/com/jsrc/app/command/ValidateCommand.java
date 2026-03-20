@@ -97,7 +97,7 @@ public class ValidateCommand implements Command {
                              Map<String, String> signatures) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("valid", true);
-        result.put("className", match.className());
+        result.put("className", ctx.qualify(match.className()));
         result.put("methodName", match.methodName());
         String sig = signatures.get(match.className() + "." + match.methodName());
         if (sig != null) result.put("signature", sig);

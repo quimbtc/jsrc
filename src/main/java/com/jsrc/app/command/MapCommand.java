@@ -53,7 +53,7 @@ public class MapCommand implements Command {
 
         for (ScoredClass sc : scored) {
             Map<String, Object> entry = new LinkedHashMap<>();
-            entry.put("class", sc.ci.name());
+            entry.put("class", sc.ci.qualifiedName());
             entry.put("pkg", MiniCommand.abbreviatePackage(sc.ci.packageName()));
             entry.put("kind", sc.ci.isInterface() ? "interface" : "class");
 

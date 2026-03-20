@@ -44,20 +44,12 @@ public class ImpactCommand implements Command {
             return 0;
         }
 
-        // Build simple→qualified name lookup
-        Map<String, String> qualifiedNames = new java.util.HashMap<>();
-        if (ctx.indexed() != null) {
-            for (var ci : ctx.getAllClasses()) {
-                qualifiedNames.put(ci.name(), ci.qualifiedName());
-            }
-        }
-
         // Direct callers
         Set<String> directCallerClasses = new LinkedHashSet<>();
         for (var target : resolved.targets()) {
             for (MethodCall call : graph.getCallersOf(target)) {
                 String caller = call.caller().className();
-                if (!"?".equals(caller)) directCallerClasses.add(qualifiedNames.getOrDefault(caller, caller));
+                if (!"?".equals(caller)) directCallerClasses.add(ctx.qualify(caller));
             }
         }
 
@@ -77,7 +69,7 @@ public class ImpactCommand implements Command {
             for (int i = 0; i < levelSize; i++) {
                 MethodReference current = queue.poll();
                 if (!"?".equals(current.className())) {
-                    allAffected.add(qualifiedNames.getOrDefault(current.className(), current.className()));
+                    allAffected.add(ctx.qualify(current.className()));
                 }
                 for (MethodCall call : graph.getCallersOf(current)) {
                     if (visited.add(call.caller())) {

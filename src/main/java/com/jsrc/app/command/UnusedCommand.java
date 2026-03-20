@@ -46,7 +46,7 @@ public class UnusedCommand implements Command {
             if (ref.methodName().equals("main") || ref.methodName().equals("<init>")) continue;
             if (graph.isRoot(ref)) {
                 Map<String, Object> entry = new LinkedHashMap<>();
-                entry.put("className", ref.className());
+                entry.put("className", ctx.qualify(ref.className()));
                 entry.put("methodName", ref.methodName());
                 unusedMethods.add(entry);
             }

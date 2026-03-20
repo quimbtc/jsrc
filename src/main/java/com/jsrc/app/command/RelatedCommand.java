@@ -96,7 +96,7 @@ public class RelatedCommand implements Command {
                         .thenComparing(Map.Entry::getKey))
                 .map(e -> {
                     Map<String, Object> item = new LinkedHashMap<>();
-                    item.put("name", e.getKey());
+                    item.put("name", ctx.qualify(e.getKey()));
                     item.put("score", e.getValue());
                     List<String> reasons = new ArrayList<>();
                     if (directDeps.contains(e.getKey())) reasons.add("dep");
