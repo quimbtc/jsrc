@@ -62,16 +62,31 @@ public class App {
         OutputFormatter formatter = OutputFormatter.create(
                 parsed.jsonOutput(), parsed.signatureOnly(), parsed.fields());
 
-        // Load codebase
-        CodeBase project = new JavaCodeBase(parsed.rootPath(), new CodeBaseLoader());
-        List<Path> javaFiles = project.getFiles();
-
-        // Apply excludes from config
+        // Load config
         var config = parsed.configPath() != null
                 ? com.jsrc.app.config.ProjectConfig.loadFrom(Path.of(parsed.configPath())).orElse(null)
                 : com.jsrc.app.config.ProjectConfig.load(Path.of(".")).orElse(null);
+
+        // Load codebase — multi-module: collect files from all sourceRoots
+        var loader = new CodeBaseLoader();
+        var javaFiles = new java.util.ArrayList<Path>();
+        if (config != null && config.sourceRoots().size() > 1) {
+            // Multi-module: iterate all source roots
+            for (String root : config.sourceRoots()) {
+                Path rootPath = Path.of(root);
+                if (!rootPath.isAbsolute()) rootPath = Path.of(".").resolve(root);
+                if (java.nio.file.Files.isDirectory(rootPath)) {
+                    javaFiles.addAll(loader.loadFilesFrom(rootPath.toString(), "java"));
+                }
+            }
+        } else {
+            CodeBase project = new JavaCodeBase(parsed.rootPath(), loader);
+            javaFiles.addAll(project.getFiles());
+        }
+
+        // Apply excludes
         if (config != null && !config.excludes().isEmpty()) {
-            javaFiles = filterExcludes(javaFiles, config.excludes());
+            javaFiles = new java.util.ArrayList<>(filterExcludes(javaFiles, config.excludes()));
         }
 
         // Build command context
