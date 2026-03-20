@@ -120,7 +120,17 @@ public final class CommandRegistry {
             new CommandDef("--resolve", "Resolve receiver type for a method call expression",
                     List.of("<expression>"), List.of("--json", "--context"), "object"),
             new CommandDef("--lint", "Pre-compile diagnostics from index (types, dead code, style)",
-                    List.of("<className>"), List.of("--json"), "array")
+                    List.of("<className>"), List.of("--json"), "array"),
+            new CommandDef("--diff-impact", "Git changes → consolidated impact analysis + suggested tests",
+                    List.of("[ref]"), List.of("--json", "--md"), "object"),
+            new CommandDef("--test-for", "Find tests related to a method with confidence level",
+                    List.of("<Class.method>"), List.of("--json"), "object"),
+            new CommandDef("--breaking-changes", "Impact via inheritance, interfaces, reflection",
+                    List.of("<className>"), List.of("--json"), "object"),
+            new CommandDef("--complexity", "Cyclomatic complexity + fan-out + effort estimate",
+                    List.of("<Class[.method]>"), List.of("--json"), "object"),
+            new CommandDef("--entry-points", "Public entry points (REST, main, scheduled, listeners)",
+                    List.of("[package]"), List.of("--json"), "array")
     );
 
     /**
