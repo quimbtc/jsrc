@@ -59,11 +59,19 @@ public class PackagesCommand implements Command {
 
         if (!ctx.fullOutput() && result.size() > 30) {
             // Compact: top 30 packages by class count + summary
+            // Strip import details — only name + class count
             var sorted = result.stream()
                     .sorted((a, b) -> Integer.compare(
                             ((Number) b.get("classes")).intValue(),
                             ((Number) a.get("classes")).intValue()))
                     .limit(30)
+                    .map(p -> {
+                        var slim = new LinkedHashMap<String, Object>();
+                        slim.put("name", p.get("name"));
+                        slim.put("classes", p.get("classes"));
+                        slim.put("methods", p.get("methods"));
+                        return slim;
+                    })
                     .toList();
             var compact = new LinkedHashMap<String, Object>();
             compact.put("totalPackages", result.size());
