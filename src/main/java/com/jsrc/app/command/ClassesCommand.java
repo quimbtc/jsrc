@@ -10,8 +10,10 @@ public class ClassesCommand implements Command {
         if (!ctx.fullOutput() && allClasses.size() > 50) {
             var compact = new java.util.LinkedHashMap<String, Object>();
             compact.put("total", allClasses.size());
-            compact.put("classes", allClasses.subList(0, 50).stream()
+            compact.put("classes", allClasses.stream()
                     .map(ci -> ci.qualifiedName().isEmpty() ? ci.name() : ci.qualifiedName())
+                    .sorted()
+                    .limit(50)
                     .toList());
             compact.put("truncated", true);
             compact.put("hint", "Use --full to see all classes");
