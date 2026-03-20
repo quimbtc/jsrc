@@ -307,6 +307,8 @@ public class App {
                   --call-chain <method>     Full call chains + Mermaid diagrams
                   --impact <method>         Change impact: callers, transitive, risk level
                                             "Binder.bind → 15 direct, 29 transitive, risk=HIGH"
+                  --test-for <method>       Find tests related to a method
+                                            [--depth N|full]  Transitive depth (default: 1)
 
                 ── AI Agent Tools ─────────────────────────────────────────
                   --validate <method>       Anti-hallucination: verify method exists
@@ -333,6 +335,9 @@ public class App {
                   --endpoints               REST endpoints (path, method, controller)
                   --drift                   Architecture + spec drift detection
                   --verify <class> --spec   Verify implementation vs Markdown spec
+                  --breaking-changes <cls>  Impact via inheritance, interfaces, reflection
+                  --complexity <class>      Cyclomatic complexity analysis
+                  --entry-points            Application entry points (main, controllers, etc.)
 
                 ── Source ─────────────────────────────────────────────────
                   --read <Class[.method]>   Read source code (method-level precision)
