@@ -108,6 +108,10 @@ class LintCommandTest {
         var baos = new ByteArrayOutputStream();
         var ctx = new CommandContext(files, tempDir.toString(), null, new JsonFormatter(false, null, new PrintStream(baos)), indexed, parser);
         new LintCommand(target).execute(ctx);
-        return (List<Map<String, Object>>) JsonReader.parse(baos.toString().trim());
+        Object parsed = JsonReader.parse(baos.toString().trim());
+        if (parsed instanceof Map<?,?> map) {
+            return (List<Map<String, Object>>) map.get("diagnostics");
+        }
+        return (List<Map<String, Object>>) parsed;
     }
 }

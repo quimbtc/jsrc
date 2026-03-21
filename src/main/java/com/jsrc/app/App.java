@@ -182,6 +182,7 @@ public class App {
         // Skip validation for free-text commands (--search accepts any pattern including |)
         // Skip validation for flag-style args (e.g. --all for --smells)
         if (arg != null && command.startsWith("--") && !arg.startsWith("--")
+                && !arg.contains(";")
                 && !List.of("--search").contains(command)) {
             if (List.of("--callers", "--callees", "--read", "--call-chain", "--smells", "--validate", "--type-check", "--impact", "--checklist", "--test-for").contains(command)) {
                 String err = InputValidator.validateMethodRef(arg, "argument");

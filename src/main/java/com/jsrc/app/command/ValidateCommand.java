@@ -33,6 +33,10 @@ public class ValidateCommand implements Command {
 
     @Override
     public int execute(CommandContext ctx) {
+        // Batch mode: "Class.method1;Class.method2" validates multiple refs
+        if (methodInput.contains(";")) {
+            return executeBatch(ctx);
+        }
         var ref = MethodResolver.parse(methodInput);
         String methodName = ref.methodName();
         var graph = ctx.callGraph();
@@ -280,5 +284,75 @@ public class ValidateCommand implements Command {
             }
         }
         return dp[a.length()][b.length()];
+    }
+
+    /**
+     * Batch validation: validates multiple method refs separated by semicolons.
+     * Returns a JSON object with per-entry results.
+     */
+    private int executeBatch(CommandContext ctx) {
+        String[] refs = methodInput.split(";");
+        List<Map<String, Object>> results = new ArrayList<>();
+        int validCount = 0;
+
+        var graph = ctx.callGraph();
+        Map<String, String> signatures = new LinkedHashMap<>();
+        if (ctx.indexed() != null) {
+            for (var entry : ctx.indexed().getEntries()) {
+                for (var ic : entry.classes()) {
+                    for (var im : ic.methods()) {
+                        signatures.put(ic.name() + "." + im.name(), im.signature());
+                    }
+                }
+            }
+        }
+
+        for (String rawRef : refs) {
+            String trimmed = rawRef.trim();
+            if (trimmed.isEmpty()) continue;
+
+            var ref = MethodResolver.parse(trimmed);
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("ref", trimmed);
+
+            Set<MethodReference> byName = graph.findMethodsByName(ref.methodName());
+            if (ref.hasClassName()) {
+                byName = byName.stream()
+                        .filter(m -> m.className().equals(ref.className()))
+                        .collect(Collectors.toSet());
+            }
+
+            if (!byName.isEmpty()) {
+                var match = byName.iterator().next();
+                entry.put("valid", true);
+                entry.put("class", match.className());
+                entry.put("method", match.methodName());
+                String sig = signatures.get(match.className() + "." + match.methodName());
+                if (sig != null) entry.put("signature", sig);
+                validCount++;
+            } else {
+                String sigMatch = matchByIndexSignature(ctx, ref);
+                if (sigMatch != null) {
+                    entry.put("valid", true);
+                    entry.put("signature", sigMatch);
+                    validCount++;
+                } else {
+                    entry.put("valid", false);
+                    var closest = findClosest(ref, graph.getAllMethods(), signatures);
+                    if (!closest.isEmpty()) {
+                        entry.put("suggestions", closest.subList(0, Math.min(3, closest.size())));
+                    }
+                }
+            }
+            results.add(entry);
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("total", results.size());
+        result.put("valid", validCount);
+        result.put("invalid", results.size() - validCount);
+        result.put("results", results);
+        ctx.formatter().printResult(result);
+        return validCount;
     }
 }

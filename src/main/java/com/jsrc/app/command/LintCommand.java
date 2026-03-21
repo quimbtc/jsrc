@@ -113,6 +113,43 @@ public class LintCommand implements Command {
             }
         }
 
+        // Check missing imports (type used in fields/methods but not imported)
+        if (ctx.indexed() != null) {
+            Set<String> importedTypes = new java.util.HashSet<>();
+            String targetPkg = target.packageName();
+            for (var entry : ctx.indexed().getEntries()) {
+                for (var ic : entry.classes()) {
+                    if (ic.name().equals(target.name())) {
+                        for (String imp : ic.imports()) {
+                            int lastDot = imp.lastIndexOf('.');
+                            if (lastDot >= 0) importedTypes.add(imp.substring(lastDot + 1));
+                            if (imp.endsWith(".*")) importedTypes.add(imp); // wildcard
+                        }
+                        // Same-package classes are auto-imported
+                        for (var otherEntry : ctx.indexed().getEntries()) {
+                            for (var otherCls : otherEntry.classes()) {
+                                if (otherCls.packageName().equals(targetPkg)) {
+                                    importedTypes.add(otherCls.name());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if (!importedTypes.isEmpty()) {
+                for (FieldInfo f : target.fields()) {
+                    String type = f.type();
+                    if (!knownTypes.contains(type) && !importedTypes.contains(type)
+                            && !type.contains(".") && !type.contains("[]")
+                            && !type.contains("<")) {
+                        diagnostics.add(diag("warning", 0,
+                                "Type '" + type + "' used in field '" + f.name()
+                                        + "' may not be imported"));
+                    }
+                }
+            }
+        }
+
         // Check for dead code (private-like methods with 0 callers)
         CallGraph graph = ctx.callGraph();
         for (var m : target.methods()) {
@@ -152,7 +189,17 @@ public class LintCommand implements Command {
             return diagnostics.size();
         }
 
-        ctx.formatter().printResult(diagnostics);
+        // Add summary
+        long errors = diagnostics.stream().filter(d -> "error".equals(d.get("severity"))).count();
+        long warnings = diagnostics.stream().filter(d -> "warning".equals(d.get("severity"))).count();
+        long infos = diagnostics.stream().filter(d -> "info".equals(d.get("severity"))).count();
+
+        Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("class", target.qualifiedName());
+        result.put("diagnostics", diagnostics);
+        result.put("summary", Map.of("errors", errors, "warnings", warnings, "infos", infos,
+                "total", diagnostics.size()));
+        ctx.formatter().printResult(result);
         return diagnostics.size();
     }
 
