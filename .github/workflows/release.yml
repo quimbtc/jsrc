@@ -69,6 +69,7 @@ jobs:
             -Djava.library.path=/usr/local/lib \
             -jar target/jsrc.jar \
             -o jsrc-linux-x64 \
+            -H:+SharedArenaSupport \
             --no-fallback
       - name: Smoke test
         run: |
@@ -115,6 +116,7 @@ jobs:
             -Djava.library.path=/usr/local/lib \
             -jar target/jsrc.jar \
             -o jsrc-macos-arm64 \
+            -H:+SharedArenaSupport \
             --no-fallback
       - name: Smoke test
         run: |
@@ -161,6 +163,7 @@ jobs:
             -Djava.library.path=/usr/local/lib \
             -jar target/jsrc.jar \
             -o jsrc-macos-x64 \
+            -H:+SharedArenaSupport \
             --no-fallback
       - name: Smoke test
         run: |
