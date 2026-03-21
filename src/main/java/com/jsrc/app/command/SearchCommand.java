@@ -21,9 +21,12 @@ import com.jsrc.app.parser.model.MethodInfo;
  */
 public class SearchCommand implements Command {
     private final String pattern;
+    private final String[] alternatives;
 
     public SearchCommand(String pattern) {
         this.pattern = pattern;
+        // Support OR patterns: "TODO|FIXME" searches for either term
+        this.alternatives = pattern.contains("|") ? pattern.split("\\|") : new String[]{pattern};
     }
 
     private static final Logger logger = LoggerFactory.getLogger(SearchCommand.class);
@@ -48,7 +51,7 @@ public class SearchCommand implements Command {
 
                 for (int i = 0; i < lines.size(); i++) {
                     String line = lines.get(i);
-                    int patternIdx = line.indexOf(pattern);
+                    int patternIdx = findFirstMatch(line);
                     if (patternIdx < 0) {
                         // No match — just update block comment state
                         inBlockComment = updateBlockCommentState(line, inBlockComment);
@@ -201,6 +204,21 @@ public class SearchCommand implements Command {
         }
 
         return currentlyInBlock;
+    }
+
+    /**
+     * Finds the first occurrence of any alternative pattern in the line.
+     * Returns the index of the first match, or -1 if none found.
+     */
+    private int findFirstMatch(String line) {
+        int earliest = -1;
+        for (String alt : alternatives) {
+            int idx = line.indexOf(alt.trim());
+            if (idx >= 0 && (earliest < 0 || idx < earliest)) {
+                earliest = idx;
+            }
+        }
+        return earliest;
     }
 
     /**

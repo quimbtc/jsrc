@@ -60,7 +60,7 @@ public class CalleesCommand implements Command {
             compact.put("method", methodInput);
             compact.put("total", callees.size());
             compact.put("callees", callees.stream()
-                    .map(e -> e.get("className") + "." + e.get("methodName"))
+                    .map(e -> e.get("class") + "." + e.get("method"))
                     .distinct()
                     .toList());
             ctx.formatter().printResult(compact);

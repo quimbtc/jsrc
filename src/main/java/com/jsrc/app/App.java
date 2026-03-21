@@ -179,9 +179,11 @@ public class App {
         String arg = extractArg(argList, command);
 
         // Validate arg for commands that need identifiers
+        // Skip validation for free-text commands (--search accepts any pattern including |)
         // Skip validation for flag-style args (e.g. --all for --smells)
-        if (arg != null && command.startsWith("--") && !arg.startsWith("--")) {
-            if (List.of("--callers", "--callees", "--read", "--search", "--call-chain", "--smells", "--validate", "--type-check", "--impact", "--checklist", "--test-for").contains(command)) {
+        if (arg != null && command.startsWith("--") && !arg.startsWith("--")
+                && !List.of("--search").contains(command)) {
+            if (List.of("--callers", "--callees", "--read", "--call-chain", "--smells", "--validate", "--type-check", "--impact", "--checklist", "--test-for").contains(command)) {
                 String err = InputValidator.validateMethodRef(arg, "argument");
                 if (err != null) { throw new BadUsageException(err); }
             } else {
@@ -336,7 +338,7 @@ public class App {
                   --drift                   Architecture + spec drift detection
                   --verify <class> --spec   Verify implementation vs Markdown spec
                   --breaking-changes <cls>  Impact via inheritance, interfaces, reflection
-                  --complexity <class>      Cyclomatic complexity analysis
+                  --complexity <class|--all> Cyclomatic complexity analysis
                   --entry-points            Application entry points (main, controllers, etc.)
 
                 ── Source ─────────────────────────────────────────────────
