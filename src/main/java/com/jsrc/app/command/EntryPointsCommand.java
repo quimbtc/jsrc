@@ -127,7 +127,31 @@ public class EntryPointsCommand implements Command {
             }
         }
 
-        ctx.formatter().printResult(entryPoints);
+        if (!ctx.fullOutput() && entryPoints.size() > 30) {
+            // Compact: counts by type + top 10 per type
+            var byType = new LinkedHashMap<String, List<Map<String, Object>>>();
+            for (var ep : entryPoints) {
+                String type = (String) ep.get("type");
+                byType.computeIfAbsent(type, k -> new ArrayList<>()).add(ep);
+            }
+            var compact = new LinkedHashMap<String, Object>();
+            compact.put("total", entryPoints.size());
+            var summary = new LinkedHashMap<String, Object>();
+            for (var e : byType.entrySet()) {
+                var typeInfo = new LinkedHashMap<String, Object>();
+                typeInfo.put("count", e.getValue().size());
+                typeInfo.put("sample", e.getValue().stream()
+                        .limit(10)
+                        .map(ep -> ep.get("class") + "." + ep.get("method"))
+                        .toList());
+                summary.put(e.getKey(), typeInfo);
+            }
+            compact.put("byType", summary);
+            compact.put("hint", "Use --full to see all " + entryPoints.size() + " entry points");
+            ctx.formatter().printResult(compact);
+        } else {
+            ctx.formatter().printResult(entryPoints);
+        }
         return entryPoints.size();
     }
 }

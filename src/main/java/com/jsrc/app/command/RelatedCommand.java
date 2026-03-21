@@ -110,11 +110,16 @@ public class RelatedCommand implements Command {
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("target", target.qualifiedName());
-        result.put("directDeps", directDeps.stream()
+        var filteredDeps = directDeps.stream()
                 .filter(d -> !d.equals(target.name()) && !UTILITY_TYPES.contains(d))
-                .toList());
+                .toList();
+        result.put("directDeps", filteredDeps);
         result.put("callers", callers.stream().toList());
-        result.put("samePackage", samePackage);
+        if (ctx.fullOutput() || samePackage.size() <= 30) {
+            result.put("samePackage", samePackage);
+        } else {
+            result.put("samePackage", samePackage.size());
+        }
         result.put("ranked", ranked);
 
         ctx.formatter().printResult(result);
