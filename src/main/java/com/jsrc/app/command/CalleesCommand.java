@@ -1,6 +1,7 @@
 package com.jsrc.app.command;
 
 import java.util.ArrayList;
+import java.util.Objects;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -60,7 +61,7 @@ public class CalleesCommand implements Command {
             compact.put("method", methodInput);
             compact.put("total", callees.size());
             compact.put("callees", callees.stream()
-                    .map(e -> e.get("class") + "." + e.get("method"))
+                    .map(e -> Objects.toString(e.get("class"), "?") + "." + Objects.toString(e.get("method"), "?"))
                     .distinct()
                     .toList());
             ctx.formatter().printResult(compact);
