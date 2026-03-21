@@ -72,7 +72,14 @@ public class MethodSearchCommand implements Command {
         return outputResults(ctx, allResults, methodName);
     }
 
-    private int outputResults(CommandContext ctx, List<Map<String, Object>> results, String methodName) {
+    private int outputResults(CommandContext ctx, List<Map<String, Object>> rawResults, String methodName) {
+        // Deduplicate by class+name+line (index fast path can produce dupes)
+        var seen = new java.util.LinkedHashSet<String>();
+        List<Map<String, Object>> results = new ArrayList<>();
+        for (var r : rawResults) {
+            String key = r.get("class") + "." + r.get("name") + ":" + r.get("line");
+            if (seen.add(key)) results.add(r);
+        }
         if (!ctx.fullOutput() && results.size() > 30) {
             var compact = new LinkedHashMap<String, Object>();
             compact.put("method", methodName);

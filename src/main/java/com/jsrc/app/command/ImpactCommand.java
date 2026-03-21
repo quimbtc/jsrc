@@ -37,9 +37,29 @@ public class ImpactCommand implements Command {
         var resolved = MethodTargetResolver.resolve(ref, graph);
 
         if (resolved.targets().isEmpty()) {
+            // Fallback: count usages of method name in code (without printing search results)
+            String searchTerm = ref.methodName();
+            long usageCount = 0;
+            for (var file : ctx.javaFiles()) {
+                try {
+                    for (String line : java.nio.file.Files.readAllLines(file)) {
+                        if (line.contains(searchTerm)) usageCount++;
+                    }
+                } catch (Exception e) { /* skip */ }
+            }
+
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("target", methodInput);
-            result.put("error", "Method not found");
+            if (usageCount > 0) {
+                result.put("error", "Method not in call graph (class may be external)");
+                result.put("textUsages", usageCount);
+                result.put("hint", "Use --search '" + searchTerm + "' for detailed locations");
+            } else {
+                result.put("error", "Method not found");
+            }
+            String closest = SummaryCommand.findClosestClass(ctx.getAllClasses(),
+                    ref.hasClassName() ? ref.className() : ref.methodName());
+            if (closest != null) result.put("suggestion", closest);
             ctx.formatter().printResult(result);
             return 0;
         }

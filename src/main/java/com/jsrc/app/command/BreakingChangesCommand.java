@@ -27,7 +27,24 @@ public class BreakingChangesCommand implements Command {
                 .findFirst().orElse(null);
 
         if (target == null) {
-            ctx.formatter().printResult(Map.of("error", "Class not found: " + className));
+            // Count text usages without printing search results
+            long usageCount = 0;
+            for (var file : ctx.javaFiles()) {
+                try {
+                    for (String line : java.nio.file.Files.readAllLines(file)) {
+                        if (line.contains(className)) usageCount++;
+                    }
+                } catch (Exception e) { /* skip */ }
+            }
+            var error = new java.util.LinkedHashMap<String, Object>();
+            error.put("error", "Class not found in index: " + className);
+            String closest = SummaryCommand.findClosestClass(allClasses, className);
+            if (closest != null) error.put("suggestion", closest);
+            if (usageCount > 0) {
+                error.put("textUsages", usageCount);
+                error.put("hint", "Class likely external. Use --search '" + className + "' for locations.");
+            }
+            ctx.formatter().printResult(error);
             return 0;
         }
 

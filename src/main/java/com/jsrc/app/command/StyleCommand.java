@@ -25,6 +25,7 @@ public class StyleCommand implements Command {
         int slf4j = 0, log4j = 0, commonsLogging = 0, jul = 0;
         int ctorInjection = 0, fieldInjection = 0;
         int requireNonNull = 0, optionalReturns = 0;
+        int nullableCount = 0, nonNullCount = 0, finalFields = 0;
         int totalClasses = allClasses.size();
 
         // Scan index for patterns
@@ -50,7 +51,14 @@ public class StyleCommand implements Command {
                     if (hasCtorParams) ctorInjection++;
                     if (hasAutowired) fieldInjection++;
 
-                    // Null handling
+                    // Null handling + annotations
+                    for (String imp : ic.imports()) {
+                        if (imp.contains("Nullable")) nullableCount++;
+                        if (imp.contains("NonNull") || imp.contains("NullMarked")) nonNullCount++;
+                    }
+                    for (var f : ic.fields()) {
+                        if (f.type() != null && !f.type().isEmpty()) finalFields++;
+                    }
                     for (var m : ic.methods()) {
                         if (m.signature() != null && m.signature().contains("requireNonNull"))
                             requireNonNull++;
@@ -146,6 +154,9 @@ public class StyleCommand implements Command {
         counts.put("ctorInjection", ctorInjection);
         counts.put("fieldInjection", fieldInjection);
         counts.put("optionalReturns", optionalReturns);
+        counts.put("nullable", nullableCount);
+        counts.put("nonNull", nonNullCount);
+        counts.put("fields", finalFields);
         result.put("counts", counts);
 
         ctx.formatter().printResult(result);

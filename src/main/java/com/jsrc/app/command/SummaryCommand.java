@@ -46,6 +46,11 @@ public class SummaryCommand implements Command {
     }
 
     /** Find the closest class name by Levenshtein distance (max 3 edits). */
+    /** Find the closest class name by Levenshtein distance (max 3 edits). Package-visible for reuse. */
+    static String findClosestClass(java.util.List<ClassInfo> allClasses, String target) {
+        return findClosest(allClasses, target);
+    }
+
     private static String findClosest(java.util.List<ClassInfo> allClasses, String target) {
         String best = null;
         int bestDist = 4; // max distance threshold
