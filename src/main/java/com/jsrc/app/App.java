@@ -235,7 +235,7 @@ public class App {
         int cmdIdx = argList.indexOf(command);
         if (cmdIdx >= 0 && cmdIdx + 1 < argList.size()) {
             String next = argList.get(cmdIdx + 1);
-            if (!next.startsWith("--")) return next;
+            if (!next.startsWith("--") || "--all".equals(next)) return next;
         }
         return null;
     }

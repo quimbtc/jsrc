@@ -78,7 +78,7 @@ public class CallersCommand implements Command {
             compact.put("method", methodInput);
             compact.put("total", callers.size());
             compact.put("callers", callers.stream()
-                    .map(e -> e.get("className") + "." + e.get("methodName"))
+                    .map(e -> e.get("class") + "." + e.get("method"))
                     .distinct()
                     .toList());
             ctx.formatter().printResult(compact);
