@@ -54,7 +54,19 @@ public class CalleesCommand implements Command {
             }
         }
 
-        ctx.formatter().printRefs(callees, "Callees", methodName);
+        if (!ctx.fullOutput() && callees.size() > 0) {
+            // Compact: just class.method list, no line numbers or qualified refs
+            var compact = new java.util.LinkedHashMap<String, Object>();
+            compact.put("method", methodInput);
+            compact.put("total", callees.size());
+            compact.put("callees", callees.stream()
+                    .map(e -> e.get("className") + "." + e.get("methodName"))
+                    .distinct()
+                    .toList());
+            ctx.formatter().printResult(compact);
+        } else {
+            ctx.formatter().printRefs(callees, "Callees", methodName);
+        }
         return callees.size();
     }
 }

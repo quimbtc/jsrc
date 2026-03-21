@@ -1,0 +1,10 @@
+%% SampleProfileApplicationTests.testGoodbyeProfileFromCommandline(1 param) -> SampleProfileApplication.main(1 param) -> SpringApplication.run(1 param)
+sequenceDiagram
+    actor Entry
+    participant SampleProfileApplicationTests
+    participant SampleProfileApplication
+    participant SpringApplication
+    Note over Entry: ⚠ No callers found (possible dead code)
+    Entry->>SampleProfileApplicationTests: testGoodbyeProfileFromCommandline(CapturedOutput)
+    SampleProfileApplicationTests->>SampleProfileApplication: main(String)
+    SampleProfileApplication->>SpringApplication: run(String)

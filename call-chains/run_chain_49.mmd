@@ -1,0 +1,10 @@
+%% LocalDevToolsAutoConfigurationTests.defaultPropertyCanBeOverriddenFromCommandLine() -> LocalDevToolsAutoConfigurationTests.initializeAndRun(2 params) -> LocalDevToolsAutoConfigurationTests.initializeAndRun(3 params) -> SpringApplication.run(1 param)
+sequenceDiagram
+    actor Entry
+    participant LocalDevToolsAutoConfigurationTests
+    participant SpringApplication
+    Note over Entry: ⚠ No callers found (possible dead code)
+    Entry->>LocalDevToolsAutoConfigurationTests: defaultPropertyCanBeOverriddenFromCommandLine()
+    LocalDevToolsAutoConfigurationTests->>LocalDevToolsAutoConfigurationTests: initializeAndRun(Class<?>, String)
+    LocalDevToolsAutoConfigurationTests->>LocalDevToolsAutoConfigurationTests: initializeAndRun(Class<?>, Map<String,Object>, String)
+    LocalDevToolsAutoConfigurationTests->>SpringApplication: run(String)

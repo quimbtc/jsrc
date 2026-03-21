@@ -97,18 +97,47 @@ public class CallChainCommand implements Command {
             }
         }
 
-        ctx.formatter().printCallChains(
-                new com.jsrc.app.model.CallChainOutput(chains, methodName, signatures, deadEndRoots));
+        if (!ctx.fullOutput() && chains.size() > 5) {
+            // Compact: summary + top 5 chains as linear paths, no Mermaid
+            var compact = new java.util.LinkedHashMap<String, Object>();
+            compact.put("method", methodName);
+            compact.put("totalChains", chains.size());
+            compact.put("maxDepth", chains.stream()
+                    .mapToInt(c -> c.steps().size()).max().orElse(0));
+            compact.put("chains", chains.stream()
+                    .sorted((a, b) -> Integer.compare(a.steps().size(), b.steps().size()))
+                    .limit(5)
+                    .map(chain -> {
+                        var entry = new java.util.LinkedHashMap<String, Object>();
+                        entry.put("depth", chain.steps().size());
+                        // Linear path: root → ... → target
+                        var path = new java.util.ArrayList<String>();
+                        path.add(chain.root().className() + "." + chain.root().methodName());
+                        for (var step : chain.steps()) {
+                            String callee = step.callee().className() + "." + step.callee().methodName();
+                            if (path.isEmpty() || !path.getLast().equals(callee)) {
+                                path.add(callee);
+                            }
+                        }
+                        entry.put("path", path);
+                        return entry;
+                    }).toList());
+            compact.put("hint", "Use --full for all " + chains.size() + " chains with Mermaid diagrams");
+            ctx.formatter().printResult(compact);
+        } else {
+            ctx.formatter().printCallChains(
+                    new com.jsrc.app.model.CallChainOutput(chains, methodName, signatures, deadEndRoots));
 
-        if (!chains.isEmpty()) {
-            MermaidDiagramGenerator generator = new MermaidDiagramGenerator(signatures, deadEndRoots);
-            try {
-                var files = generator.writeAll(chains, Paths.get(outputDir), methodName);
-                for (Path file : files) {
-                    System.err.printf("  Written: %s%n", file);
+            if (!chains.isEmpty()) {
+                MermaidDiagramGenerator generator = new MermaidDiagramGenerator(signatures, deadEndRoots);
+                try {
+                    var files = generator.writeAll(chains, Paths.get(outputDir), methodName);
+                    for (Path file : files) {
+                        System.err.printf("  Written: %s%n", file);
+                    }
+                } catch (IOException ex) {
+                    System.err.printf("Error writing diagrams: %s%n", ex.getMessage());
                 }
-            } catch (IOException ex) {
-                System.err.printf("Error writing diagrams: %s%n", ex.getMessage());
             }
         }
         return chains.size();

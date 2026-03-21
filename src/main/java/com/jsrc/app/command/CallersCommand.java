@@ -72,7 +72,19 @@ public class CallersCommand implements Command {
             }
         }
 
-        ctx.formatter().printRefs(callers, "Callers", methodName);
+        if (!ctx.fullOutput() && callers.size() > 0) {
+            // Compact: just class.method list, no line numbers or qualified refs
+            var compact = new java.util.LinkedHashMap<String, Object>();
+            compact.put("method", methodInput);
+            compact.put("total", callers.size());
+            compact.put("callers", callers.stream()
+                    .map(e -> e.get("className") + "." + e.get("methodName"))
+                    .distinct()
+                    .toList());
+            ctx.formatter().printResult(compact);
+        } else {
+            ctx.formatter().printRefs(callers, "Callers", methodName);
+        }
         return callers.size();
     }
 }

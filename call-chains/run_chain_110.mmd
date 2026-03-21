@@ -1,0 +1,8 @@
+%% Application.main(1 param) -> SpringApplication.run(1 param)
+sequenceDiagram
+    actor Entry
+    participant Application
+    participant SpringApplication
+    Note over Entry: ⚠ No callers found (possible dead code)
+    Entry->>Application: main(String[])
+    Application->>SpringApplication: run(String)

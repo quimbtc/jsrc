@@ -1,0 +1,10 @@
+%% SpringApplicationBuilder.sibling(2 params) -> SpringApplicationBuilder.runAndExtractParent(1 param) -> SpringApplicationBuilder.run(1 param) -> SpringApplication.run(1 param)
+sequenceDiagram
+    actor Entry
+    participant SpringApplicationBuilder
+    participant SpringApplication
+    Note over Entry: ⚠ No callers found (possible dead code)
+    Entry->>SpringApplicationBuilder: sibling(Class<?>)
+    SpringApplicationBuilder->>SpringApplicationBuilder: runAndExtractParent(String)
+    SpringApplicationBuilder->>SpringApplicationBuilder: run(String)
+    SpringApplicationBuilder->>SpringApplication: run(String)

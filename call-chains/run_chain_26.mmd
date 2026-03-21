@@ -1,0 +1,10 @@
+%% SampleBootstrapRegistryApplicationTests.testBootstrapper(1 param) -> SampleBootstrapRegistryApplication.main(1 param) -> SpringApplication.run(1 param)
+sequenceDiagram
+    actor Entry
+    participant SampleBootstrapRegistryApplicationTests
+    participant SampleBootstrapRegistryApplication
+    participant SpringApplication
+    Note over Entry: ⚠ No callers found (possible dead code)
+    Entry->>SampleBootstrapRegistryApplicationTests: testBootstrapper(CapturedOutput)
+    SampleBootstrapRegistryApplicationTests->>SampleBootstrapRegistryApplication: main(String[])
+    SampleBootstrapRegistryApplication->>SpringApplication: run(String)

@@ -1,0 +1,12 @@
+%% SpringBootContextLoaderAotTests.loadContextForAotProcessingAndAotRuntime() -> SpringBootContextLoaderAotTests.assertCompiledTest(1 param) -> SpringBootContextLoader.loadContextForAotRuntime(2 params) -> SpringBootContextLoader.loadContext(4 params) -> SpringApplication.run(1 param)
+sequenceDiagram
+    actor Entry
+    participant SpringBootContextLoaderAotTests
+    participant SpringBootContextLoader
+    participant SpringApplication
+    Note over Entry: ⚠ No callers found (possible dead code)
+    Entry->>SpringBootContextLoaderAotTests: loadContextForAotProcessingAndAotRuntime()
+    SpringBootContextLoaderAotTests->>SpringBootContextLoaderAotTests: assertCompiledTest(Class<?>)
+    SpringBootContextLoaderAotTests->>SpringBootContextLoader: loadContextForAotRuntime(MergedContextConfiguration, ApplicationContextInitializer<ConfigurableApplicationContext>)
+    SpringBootContextLoader->>SpringBootContextLoader: loadContext(MergedContextConfiguration, Mode, ApplicationContextInitializer<ConfigurableApplicationContext>, RuntimeHints)
+    SpringBootContextLoader->>SpringApplication: run(String)

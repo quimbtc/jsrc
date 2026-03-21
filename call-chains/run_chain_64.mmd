@@ -1,0 +1,8 @@
+%% MultipleApplicationsMainMethod.main(1 param) -> SpringApplication.run(1 param)
+sequenceDiagram
+    actor Entry
+    participant MultipleApplicationsMainMethod
+    participant SpringApplication
+    Note over Entry: ⚠ No callers found (possible dead code)
+    Entry->>MultipleApplicationsMainMethod: main(String[])
+    MultipleApplicationsMainMethod->>SpringApplication: run(String)

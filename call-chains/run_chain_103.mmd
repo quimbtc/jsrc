@@ -1,0 +1,10 @@
+%% SpringApplicationAdminJmxAutoConfigurationTests.onlyRegisteredOnceWhenThereIsAChildContext() -> SpringApplicationBuilder.run(1 param) -> SpringApplication.run(1 param)
+sequenceDiagram
+    actor Entry
+    participant SpringApplicationAdminJmxAutoConfigurationTests
+    participant SpringApplicationBuilder
+    participant SpringApplication
+    Note over Entry: ⚠ No callers found (possible dead code)
+    Entry->>SpringApplicationAdminJmxAutoConfigurationTests: onlyRegisteredOnceWhenThereIsAChildContext()
+    SpringApplicationAdminJmxAutoConfigurationTests->>SpringApplicationBuilder: run(String)
+    SpringApplicationBuilder->>SpringApplication: run(String)

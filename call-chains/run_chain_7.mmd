@@ -1,0 +1,11 @@
+%% SpringBootContextLoaderTests.whenMainMethodPresentRegisterReflectionHints() -> SpringBootContextLoader.loadContextForAotProcessing(2 params) -> SpringBootContextLoader.loadContext(4 params) -> SpringApplication.run(1 param)
+sequenceDiagram
+    actor Entry
+    participant SpringBootContextLoaderTests
+    participant SpringBootContextLoader
+    participant SpringApplication
+    Note over Entry: ⚠ No callers found (possible dead code)
+    Entry->>SpringBootContextLoaderTests: whenMainMethodPresentRegisterReflectionHints()
+    SpringBootContextLoaderTests->>SpringBootContextLoader: loadContextForAotProcessing(MergedContextConfiguration, RuntimeHints)
+    SpringBootContextLoader->>SpringBootContextLoader: loadContext(MergedContextConfiguration, Mode, ApplicationContextInitializer<ConfigurableApplicationContext>, RuntimeHints)
+    SpringBootContextLoader->>SpringApplication: run(String)

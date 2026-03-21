@@ -1,0 +1,13 @@
+%% SpringApplicationBuilderTests.customApplicationWithResourceLoader() -> SpringApplicationBuilder.build() -> SpringApplicationBuilder.build(1 param) -> SpringApplicationBuilder.configureAsChildIfNecessary(1 param) -> SpringApplicationBuilder.run(1 param) -> SpringApplication.run(1 param)
+sequenceDiagram
+    actor Entry
+    participant SpringApplicationBuilderTests
+    participant SpringApplicationBuilder
+    participant SpringApplication
+    Note over Entry: ⚠ No callers found (possible dead code)
+    Entry->>SpringApplicationBuilderTests: customApplicationWithResourceLoader()
+    SpringApplicationBuilderTests->>SpringApplicationBuilder: build()
+    SpringApplicationBuilder->>SpringApplicationBuilder: build(String)
+    SpringApplicationBuilder->>SpringApplicationBuilder: configureAsChildIfNecessary(String)
+    SpringApplicationBuilder->>SpringApplicationBuilder: run(String)
+    SpringApplicationBuilder->>SpringApplication: run(String)
