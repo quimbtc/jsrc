@@ -61,11 +61,22 @@ public class TestForCommand implements Command {
             }
         }
 
-        // Cache test class names to avoid O(callers × classes) in BFS
+        // Pre-build set of classes that have @Test methods (O(n) scan, done once)
+        Set<String> classesWithTestAnnotation = new java.util.HashSet<>();
+        for (var ci : allClasses) {
+            if (ci.methods().stream().anyMatch(m -> m.annotations().stream()
+                    .anyMatch(a -> a.name().equals("Test")))) {
+                classesWithTestAnnotation.add(ci.name());
+            }
+        }
+
+        // Cache test class names: name heuristic OR has @Test methods
         Set<String> testClassNames = new LinkedHashSet<>();
         for (var ci : allClasses) {
-            if (isTestClass(ci.name(), allClasses)) {
-                testClassNames.add(ci.name());
+            String name = ci.name();
+            if (name.endsWith("Test") || name.endsWith("Tests") || name.endsWith("IT")
+                    || classesWithTestAnnotation.contains(name)) {
+                testClassNames.add(name);
             }
         }
 

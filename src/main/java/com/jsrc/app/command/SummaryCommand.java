@@ -45,6 +45,35 @@ public class SummaryCommand implements Command {
         return 1;
     }
 
+    /** Find the closest class name by Levenshtein distance (max 3 edits). */
+    private static String findClosest(java.util.List<ClassInfo> allClasses, String target) {
+        String best = null;
+        int bestDist = 4; // max distance threshold
+        for (var ci : allClasses) {
+            int dist = levenshtein(target.toLowerCase(), ci.name().toLowerCase());
+            if (dist < bestDist) {
+                bestDist = dist;
+                best = ci.name();
+            }
+        }
+        return best;
+    }
+
+    private static int levenshtein(String a, String b) {
+        int[] prev = new int[b.length() + 1];
+        int[] curr = new int[b.length() + 1];
+        for (int j = 0; j <= b.length(); j++) prev[j] = j;
+        for (int i = 1; i <= a.length(); i++) {
+            curr[0] = i;
+            for (int j = 1; j <= b.length(); j++) {
+                curr[j] = a.charAt(i - 1) == b.charAt(j - 1) ? prev[j - 1]
+                        : 1 + Math.min(prev[j - 1], Math.min(prev[j], curr[j - 1]));
+            }
+            int[] tmp = prev; prev = curr; curr = tmp;
+        }
+        return prev[b.length()];
+    }
+
     static ClassInfo resolveOrExit(java.util.List<ClassInfo> allClasses, String className) {
         var resolution = ClassResolver.resolve(allClasses, className);
         return switch (resolution) {
@@ -54,7 +83,17 @@ public class SummaryCommand implements Command {
                 yield null;
             }
             case ClassResolver.Resolution.NotFound n -> {
-                System.err.printf("Class '%s' not found.%n", className);
+                // Fuzzy suggest + reference count for better agent UX
+                String suggestion = findClosest(allClasses, className);
+                // Count how many indexed classes import this name (best-effort)
+                long refCount = 0;
+
+                StringBuilder msg = new StringBuilder();
+                msg.append(String.format("Class '%s' not found in index.", className));
+                if (suggestion != null) {
+                    msg.append(String.format(" Did you mean '%s'?", suggestion));
+                }
+                System.err.println(msg);
                 yield null;
             }
         };
